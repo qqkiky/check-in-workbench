@@ -1,0 +1,112 @@
+{
+  "weekStart": "2026-08-23",
+  "weekEnd": "2026-08-23",
+  "daysCovered": 1,
+  "generatedAt": "2026-08-23T18:25:29+08:00",
+  "overview": "本周（统计周期 2026-08-23 ~ 2026-08-23，覆盖 1 天）共汇总 11 条宠物与医药行业资讯，其中行业动态 5 条、药品信息 3 条、监管动态 3 条。",
+  "highlights": [
+    "Fromm Family Foods 因可能混入金属异物，主动召回两款犬用湿粮",
+    "更新：Oma's Pride 因可能的沙门氏菌健康风险，主动召回一批犬用鸡肉配方",
+    "FDA 最终确定指南：依据抗菌药对人医重要性评估动物用抗菌药安全性",
+    "农业农村部关于印发《2026—2030年全国官方兽医培训计划》的通知",
+    "农业农村部公告 第1052号（批准8种兽药产品在我国注册、再注册、变更注册）",
+    "农业农村部兽药评审中心关于进一步优化兽药研发注册咨询问题答复工作的通告",
+    "IDEXX 实验室以 AI 与癌症检测瞄准 450 亿美元宠物诊断市场",
+    "Zoetis 的 Simparica Trio 获紧急使用授权，用于治疗犬及幼犬新大陆螺旋蝇蛆病"
+  ],
+  "sections": {
+    "industry": [
+      {
+        "title": "IDEXX Laboratories Targets $45B Pet Diagnostics Opportunity With AI, Cancer Tests",
+        "url": "https://www.marketbeat.com/instant-alerts/idexx-laboratories-targets-45b-pet-diagnostics-opportunity-with-ai-cancer-tests-2026-08-14/?utm_source=yahoofinance&amp;utm_medium=yahoofinance&amp;.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-08-14 18:03",
+        "lang": "en",
+        "titleZh": "IDEXX 实验室以 AI 与癌症检测瞄准 450 亿美元宠物诊断市场",
+        "zhSummary": "IDEXX 在 2026 投资者日公布以创新为驱动的增长战略，重点布局 450 亿美元全球伴侣动物检测市场，强调 AI 与癌症早筛检测能力。"
+      },
+      {
+        "title": "Zoetis Receives Emergency Use Authorization for Simparica Trio® (sarolaner, moxidectin, and pyrantel chewable tablets) for Treatment of New World Screwworm Infestations in Dogs and Puppies",
+        "url": "https://finance.yahoo.com/healthcare/articles/zoetis-receives-emergency-authorization-simparica-195100958.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-08-13 19:51",
+        "lang": "en",
+        "titleZh": "Zoetis 的 Simparica Trio 获紧急使用授权，用于治疗犬及幼犬新大陆螺旋蝇蛆病",
+        "zhSummary": "Zoetis 宣布 FDA 授予其广谱驱虫药 Simparica Trio 紧急使用授权（EUA），用于新大陆螺旋蝇（New World Screwworm）侵袭治疗。"
+      },
+      {
+        "title": "Elanco's CLiK(TM) Extra (Dicyclanil Topical Suspension) Wound Spray Receives FDA Emergency Use Authorization for Application on or Around Wounds for Prevention of New World Screwworm in Variety of Livestock and Captive and Captured Wildlife Species",
+        "url": "https://finance.yahoo.com/healthcare/articles/elancos-clik-tm-extra-dicyclanil-142500809.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-08-11 14:25",
+        "lang": "en",
+        "titleZh": "Elanco 的 CLiK™ Extra 伤口喷雾获 FDA 紧急使用授权，用于预防新大陆螺旋蝇蛆病",
+        "zhSummary": "Elanco 动物保健宣布 FDA 授予 CLiK Extra 伤口喷雾 EUA，可在伤口及周边施用，预防家畜与野生动物感染新大陆螺旋蝇。"
+      },
+      {
+        "title": "IDEXX Expands Catalyst Platform into Cardiac Disease with First and Only Dual-Species Point-of-Care NT-proBNP Test",
+        "url": "https://finance.yahoo.com/healthcare/articles/idexx-expands-catalyst-platform-cardiac-110000498.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-08-11 11:00",
+        "lang": "en",
+        "titleZh": "IDEXX 将 Catalyst 平台拓展至心脏病领域，推出双物种即时 NT-proBNP 检测",
+        "zhSummary": "IDEXX 发布 Catalyst™ proBNP 检测，是首款也是唯一一款可在诊所内使用、覆盖双物种（犬猫）的即时心脏病评估检测。"
+      },
+      {
+        "title": "黑龙江：国家及省中药材产业技术体系协同创新交流会暨寒地龙药高质量发展推进会在哈尔滨召开",
+        "url": "http://www.ivdc.org.cn/xwdt/dfxw/202608/t20260820_82503.htm",
+        "source": "黑龙江省农业农村厅",
+        "date": "2026-08-20 08:17:00"
+      }
+    ],
+    "drug": [
+      {
+        "title": "农业农村部关于印发《2026—2030年全国官方兽医培训计划》的通知",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202608/t20260818_82249.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-18 08:24:00"
+      },
+      {
+        "title": "农业农村部公告 第1052号（批准8种兽药产品在我国注册、再注册、变更注册）",
+        "url": "http://www.ivdc.org.cn/xxgk/zcfg/nyncbgg/202608/t20260817_82247.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-17 13:32:00"
+      },
+      {
+        "title": "农业农村部兽药评审中心关于进一步优化兽药研发注册咨询问题答复工作的通告",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202608/t20260810_81688.htm",
+        "source": "中国兽医药品监察所",
+        "date": "2026-08-10 14:09:00"
+      }
+    ],
+    "regulatory": [
+      {
+        "title": "Fromm Family Foods Voluntarily Recalls Turkey Pâté Wet Food For Dogs and Diner Classic Milo’s Meatloaf Pâté Wet Food For Dogs Due to Potential Metal Contamination",
+        "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/fromm-family-foods-voluntarily-recalls-turkey-pate-wet-food-dogs-and-diner-classic-milos-meatloaf",
+        "source": "FDA CVM",
+        "date": "2026-08-21",
+        "lang": "en",
+        "titleZh": "Fromm Family Foods 因可能混入金属异物，主动召回两款犬用湿粮",
+        "zhSummary": "Fromm Family Foods 因潜在金属污染，自愿召回 Turkey Pâté 与 Diner Classic Milo's Meatloaf 两款犬用湿粮。"
+      },
+      {
+        "title": "UPDATED: Oma's Pride Voluntarily Recalls One Lot of Woof Complete Canine Chicken Recipe (6 Lb Bag) Because of Possible Salmonella Health Risk",
+        "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/updated-omas-pride-voluntarily-recalls-one-lot-woof-complete-canine-chicken-recipe-6-lb-bag-because",
+        "source": "FDA CVM",
+        "date": "2026-08-17",
+        "lang": "en",
+        "titleZh": "更新：Oma's Pride 因可能的沙门氏菌健康风险，主动召回一批犬用鸡肉配方",
+        "zhSummary": "Oma's Pride 因可能存在沙门氏菌风险，自愿召回一批 6 磅装 Woof 全价犬用鸡肉配方犬粮（更新通报）。"
+      },
+      {
+        "title": "FDA Finalizes Guidance on Evaluating Safety of Antimicrobial Animal Drugs Based on Their Importance in Human Medicine",
+        "url": "https://www.fda.gov/animal-veterinary/cvm-updates/fda-finalizes-guidance-evaluating-safety-antimicrobial-animal-drugs-based-their-importance-human",
+        "source": "FDA CVM",
+        "date": "2026-08-05",
+        "lang": "en",
+        "titleZh": "FDA 最终确定指南：依据抗菌药对人医重要性评估动物用抗菌药安全性",
+        "zhSummary": "FDA 最终确定一份指南，明确如何基于抗菌药物在人类医学中的重要性，评估动物用抗菌药的安全性，以减缓耐药性风险。"
+      }
+    ]
+  }
+}
