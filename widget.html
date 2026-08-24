@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#3B82F6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="期待小组件" />
+    <link rel="manifest" href="widget-manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <title>期待 · 今日小组件</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; }
+      #widget-root { width: 100%; height: 100%; }
+      .install-hint {
+        max-width: 480px; margin: 24px auto; padding: 16px; border-radius: 16px;
+        background: #F2F2F7; color: #1C1C1E; line-height: 1.6;
+      }
+      .install-hint h2 { margin: 0 0 6px; font-size: 16px; }
+      .install-hint ol { padding-left: 20px; margin: 6px 0; }
+      .install-hint li { margin: 2px 0; font-size: 14px; }
+      .install-hint .tip { font-size: 12px; color: #8E8E93; margin-top: 8px; }
+      .install-hint button {
+        display: block; margin: 12px auto 0; padding: 8px 16px;
+        background: #007AFF; color: #fff; border: 0; border-radius: 999px;
+        font-size: 14px; font-weight: 500; cursor: pointer;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/widget-Bc79hrZg.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/index-ClYqEkSj.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-CGEtg4gP.css">
+  </head>
+  <body>
+    <div id="widget-root"></div>
+    <!-- 首次访问（非独立 PWA 模式）显示安装引导，添加到主屏幕后这层会自动消失 -->
+    <div id="install-hint" class="install-hint" style="display:none">
+      <h2>📲 把小组件添加到主屏幕</h2>
+      <p style="font-size:13px;color:#3C3C43;margin:4px 0">在桌面一键查看今天的待办与进度。</p>
+      <ol id="install-steps"></ol>
+      <p class="tip">小提示：把网页加到主屏幕后，从桌面图标打开将全屏显示小组件。</p>
+      <button onclick="document.getElementById('install-hint').style.display='none'">知道了</button>
+    </div>
+    <script>
+      (function () {
+        // 已在独立 PWA 模式（已加到主屏幕）就不显示引导
+        var inStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        if (inStandalone) return;
+        var hint = document.getElementById('install-hint');
+        var steps = document.getElementById('install-steps');
+        var ua = navigator.userAgent;
+        var isWeChat = /MicroMessenger|WeChat/i.test(ua);
+        var isMiui = /MiuiBrowser|XiaoMi|Redmi/i.test(ua);
+        var isIOS = /iPad|iPhone|iPod/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+        var isAndroid = /Android/.test(ua) && /Chrome/.test(ua);
+        if (isWeChat) {
+          steps.innerHTML =
+            '<li>点右上角 <b>「···」</b></li>' +
+            '<li>选择 <b>「在浏览器打开」</b>（或「复制链接」）</li>' +
+            '<li>用 Safari / Chrome 打开后，再按系统提示添加到主屏幕</li>';
+        } else if (isIOS) {
+          steps.innerHTML =
+            '<li>点击 Safari 底部的 <b>分享按钮</b> ⬆️</li>' +
+            '<li>选择 <b>「添加到主屏幕」</b></li>' +
+            '<li>确认后点击右上角 <b>「添加」</b></li>';
+        } else if (isAndroid) {
+          if (isMiui) {
+            steps.innerHTML =
+              '<li>点浏览器 <b>菜单 ⋮</b>（底部或右上角）</li>' +
+              '<li>选 <b>「添加到主屏」</b>；找不到就点「更多」→「添加到桌面」</li>' +
+              '<li>若点了 <b>没反应</b>：去 <b>系统设置 → 应用 → 小米浏览器 → 权限</b> 开启「桌面快捷方式」，再重试</li>' +
+              '<li>或复制本链接到 <b>Chrome</b> 打开安装更稳</li>';
+          } else {
+            steps.innerHTML =
+              '<li>点击右上角菜单 ⋮</li>' +
+              '<li>选择 <b>「添加到主屏幕」</b> 或「安装应用」</li>' +
+              '<li>桌面会出现「期待小组件」图标</li>';
+          }
+        } else {
+          steps.innerHTML =
+            '<li>点击地址栏右侧的 <b>「安装」</b> 图标</li>' +
+            '<li>在弹窗中点「安装」</li>' +
+            '<li>之后从桌面 / 开始菜单直接打开</li>';
+        }
+        hint.style.display = 'block';
+      })();
+    </script>
+  </body>
+</html>
