@@ -1,7 +1,7 @@
 // 打卡工作台 Service Worker —— 离线优先体验 + 可靠更新
 // 策略：导航请求网络优先（保证拿到最新版本），静态资源 stale-while-revalidate。
 // 这样每次部署新版本后，用户下次打开即可加载新版，并在有新版本时由页面提示更新。
-const CACHE = 'daka-2026-08-25-v37'
+const CACHE = 'daka-2026-08-25-v38'
 const CORE = ['./', './index.html', './widget.html', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './manifest.webmanifest', './widget-manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
