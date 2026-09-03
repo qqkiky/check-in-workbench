@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-23T18:25:51+08:00",
+  "generatedAt": "2026-09-03T23:28:33+08:00",
   "items": [
     {
       "title": "Fromm Family Foods Voluntarily Recalls Turkey Pâté Wet Food For Dogs and Diner Classic Milo’s Meatloaf Pâté Wet Food For Dogs Due to Potential Metal Contamination",
@@ -10,6 +10,16 @@
       "lang": "en",
       "titleZh": "Fromm Family Foods 因可能混入金属异物，主动召回两款犬用湿粮（火鸡酱与 Milo's 肉糕酱）",
       "zhSummary": "Fromm Family Foods 因潜在金属污染，自愿召回 Turkey Pâté 与 Diner Classic Milo's Meatloaf 两款犬用湿粮。"
+    },
+    {
+      "title": "Michael Burry-Backed ZTS Stock Climbs Following FDA Green Light For Dog Pill Against Screwworm",
+      "summary": "",
+      "url": "https://finance.yahoo.com/m/a7b0fc1b-97e6-3a52-93d1-a503c0373210/michael-burry-backed-zts.html",
+      "source": "Yahoo Finance",
+      "date": "2026-08-19",
+      "lang": "en",
+      "titleZh": "FDA 批准犬用驱虫药紧急使用，Michael Burry 持仓的 Zoetis 股价上涨",
+      "zhSummary": "FDA 授权 Zoetis 的 Simparica TRIO 用于治疗犬新世界螺旋蝇蛆病，消息推动 ZTS 股价上涨约 3%。"
     },
     {
       "title": "UPDATED: Oma's Pride Voluntarily Recalls One Lot of Woof Complete Canine Chicken Recipe (6 Lb Bag) Because of Possible Salmonella Health Risk",
@@ -52,6 +62,16 @@
       "zhSummary": "Zoetis 宣布 FDA 授予其广谱驱虫药 Simparica Trio 紧急使用授权（EUA），用于犬和幼犬的新大陆螺旋蝇（New World Screwworm）侵袭治疗。"
     },
     {
+      "title": "ZTS Q2 Earnings Call Flags Deeper Companion Animal Pressure",
+      "summary": "",
+      "url": "https://finance.yahoo.com/healthcare/articles/zts-q2-earnings-call-flags-140000848.html",
+      "source": "Yahoo Finance",
+      "date": "2026-08-12",
+      "lang": "en",
+      "titleZh": "Zoetis 二季度财报电话会凸显伴侣动物业务承压加深",
+      "zhSummary": "Zoetis 二季度伴侣动物业务全球收入有机下滑 6%、美国下滑 11%，皮肤病与驱虫药竞争加剧，公司下调全年指引。"
+    },
+    {
       "title": "Elanco's CLiK(TM) Extra (Dicyclanil Topical Suspension) Wound Spray Receives FDA Emergency Use Authorization for Application on or Around Wounds for Prevention of New World Screwworm in Variety of Livestock and Captive and Captured Wildlife Species",
       "summary": "Vigilance and early intervention are key to minimizing animal injury and limiting the parasite's spread, according to Elanco's technical experts Emergency Use A",
       "url": "https://finance.yahoo.com/healthcare/articles/elancos-clik-tm-extra-dicyclanil-142500809.html?.tsrc=rss",
@@ -82,6 +102,16 @@
       "zhSummary": "Elanco 动物保健宣布 FDA 授予 CLiK Extra 伤口喷雾 EUA，可在伤口及周边施用，预防家畜与野生动物感染新大陆螺旋蝇（与 8 月 11 日通报为同一产品不同批次新闻）。"
     },
     {
+      "title": "Zoetis cuts annual forecasts as pet healthcare demand slows",
+      "summary": "",
+      "url": "https://finance.yahoo.com/healthcare/articles/zoetis-cuts-annual-forecasts-pet-121132124.html",
+      "source": "Yahoo Finance",
+      "date": "2026-08-06",
+      "lang": "en",
+      "titleZh": "Zoetis 因宠物医疗需求放缓下调全年业绩预期",
+      "zhSummary": "因伴侣动物门诊量下降、宠物主价格敏感及竞争加剧，Zoetis 下调 2026 年营收与盈利指引，二季度营收不及预期。"
+    },
+    {
       "title": "FDA Finalizes Guidance on Evaluating Safety of Antimicrobial Animal Drugs Based on Their Importance in Human Medicine",
       "summary": "",
       "url": "https://www.fda.gov/animal-veterinary/cvm-updates/fda-finalizes-guidance-evaluating-safety-antimicrobial-animal-drugs-based-their-importance-human",
@@ -90,6 +120,26 @@
       "lang": "en",
       "titleZh": "FDA 最终确定指南：依据抗菌药对人医重要性评估动物用抗菌药安全性",
       "zhSummary": "FDA 最终确定一份指南，明确如何基于抗菌药物在人类医学中的重要性，评估动物用抗菌药的安全性，以减缓耐药性风险。"
+    },
+    {
+      "title": "CVM GFI #152 Evaluating the Safety of Antimicrobial New Animal Drugs with Regard to Their Microbiological Effects on Bacteria of Human Health Concern",
+      "summary": "",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/cvm-gfi-152-evaluating-safety-antimicrobial-new-animal-drugs-regard-their-microbiological-effects",
+      "source": "FDA CVM",
+      "date": "2026-08-05",
+      "lang": "en",
+      "titleZh": "CVM 指南 GFI #152——评估抗菌类新兽药的微生物学安全性（对人医关切细菌的影响）",
+      "zhSummary": "FDA 发布 GFI #152 指南，指导评估抗菌新兽药对人医关切细菌的微生物学影响安全性。"
+    },
+    {
+      "title": "American Regent, Inc. Animal Health Issues Nationwide Recall of Two Lots of Adequan® Canine and Two Lots of Adequan® I.M. Due to Visible Glass Fiber Material in the Product",
+      "summary": "",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/american-regent-inc-animal-health-issues-nationwide-recall-two-lots-adequanr-canine-and-two-lots",
+      "source": "FDA CVM",
+      "date": "2026-07-31",
+      "lang": "en",
+      "titleZh": "American Regent 动物健康部全国召回两批 Adequan® Canine 与两批 Adequan® I.M.，因产品检出可见玻璃纤维",
+      "zhSummary": "因产品中发现可见玻璃纤维材料，American Regent 全国召回部分批次的犬用及注射用 Adequan 关节保健药。"
     },
     {
       "title": "New leadership team appointments",
@@ -112,6 +162,36 @@
       "zhSummary": "FDA 发布 2027 财年《动物药用户付费法案》(ADUFA) 与《动物仿制药用户付费法案》(AGDUFA) 的收费标准。"
     },
     {
+      "title": "First oral medicine targeting interleukin-23 receptor recommended for plaque psoriasis",
+      "summary": "",
+      "url": "https://www.ema.europa.eu/en/news/first-oral-medicine-targeting-interleukin-23-receptor-recommended-plaque-psoriasis",
+      "source": "EMA",
+      "date": "2026-07-24",
+      "lang": "en",
+      "titleZh": "EMA 推荐首款靶向白细胞介素-23 受体的口服药用于斑块状银屑病",
+      "zhSummary": "人用药品委员会（CHMP）推荐首款靶向 IL-23 受体的口服药物治疗中重度斑块状银屑病。"
+    },
+    {
+      "title": "New treatment option for neovascular age-related macular degeneration",
+      "summary": "",
+      "url": "https://www.ema.europa.eu/en/news/new-treatment-option-neovascular-age-related-macular-degeneration",
+      "source": "EMA",
+      "date": "2026-07-24",
+      "lang": "en",
+      "titleZh": "新生血管性年龄相关性黄斑变性迎来新治疗选择",
+      "zhSummary": "EMA 推荐通过眼内植入装置持续给药的 Susvimo，减少频繁的玻璃体内注射需求。"
+    },
+    {
+      "title": "Meeting highlights from the Committee for Medicinal Products for Human Use (CHMP) 20-23 July 2026",
+      "summary": "",
+      "url": "https://www.ema.europa.eu/en/news/meeting-highlights-committee-medicinal-products-human-use-chmp-20-23-july-2026",
+      "source": "EMA",
+      "date": "2026-07-24",
+      "lang": "en",
+      "titleZh": "人用药品委员会（CHMP）2026年7月20–23日会议要点",
+      "zhSummary": "CHMP 会议推荐 12 款新药获批、8 款药品拓展适应症。"
+    },
+    {
       "title": "FDA Releases National Antimicrobial Resistance Monitoring System (NARMS) Strategic Plan for 2026–2030",
       "summary": "",
       "url": "https://www.fda.gov/animal-veterinary/cvm-updates/fda-releases-national-antimicrobial-resistance-monitoring-system-narms-strategic-plan-2026-2030",
@@ -130,6 +210,46 @@
       "lang": "en",
       "titleZh": "欧洲兽药委员会（CVMP）2026年7月14—16日会议要点",
       "zhSummary": "EMA 公布兽药委员会（CVMP）7月会议要点，涵盖兽药科学审评与监管更新。"
+    },
+    {
+      "title": "Zoetis Launches Lenivia (izenivetmab injection) in Canada and the European Union",
+      "summary": "",
+      "url": "https://finance.yahoo.com/healthcare/articles/zoetis-launches-lenivia-izenivetmab-injection-123000377.html",
+      "source": "Yahoo Finance",
+      "date": "2026-07-15",
+      "lang": "en",
+      "titleZh": "Zoetis 在加拿大与欧盟上市 Lenivia（伊泽尼单抗注射液）",
+      "zhSummary": "Zoetis 推出犬骨关节炎长效单克隆抗体疗法 Lenivia，单次皮下注射可提供长达三个月的疼痛缓解。"
+    },
+    {
+      "title": "EMA and EISMEA boost cooperation to accelerate health innovations",
+      "summary": "",
+      "url": "https://www.ema.europa.eu/en/news/ema-eismea-boost-cooperation-accelerate-health-innovations",
+      "source": "EMA",
+      "date": "2026-07-15",
+      "lang": "en",
+      "titleZh": "EMA 与 EISMEA 加强合作以加速健康创新",
+      "zhSummary": "双方将加强协作，鼓励创新药物与健康解决方案的开发。"
+    },
+    {
+      "title": "Executive Director Emer Cooke's speech at the European Parliament's Committee on Public Health",
+      "summary": "",
+      "url": "https://www.ema.europa.eu/en/news/executive-director-emer-cookes-speech-european-parliaments-committee-public-health",
+      "source": "EMA",
+      "date": "2026-07-15",
+      "lang": "en",
+      "titleZh": "EMA 执行董事 Emer Cooke 在欧洲议会公共卫生委员会发言",
+      "zhSummary": "Emer Cooke 在 SANT 委员会年度观点交流中发表讲话。"
+    },
+    {
+      "title": "Meeting highlights from the Pharmacovigilance Risk Assessment Committee (PRAC) 6-9 July 2026",
+      "summary": "",
+      "url": "https://www.ema.europa.eu/en/news/meeting-highlights-pharmacovigilance-risk-assessment-committee-prac-6-9-july-2026",
+      "source": "EMA",
+      "date": "2026-07-10",
+      "lang": "en",
+      "titleZh": "药物警戒风险评估委员会（PRAC）2026年7月6–9日会议要点",
+      "zhSummary": "PRAC 就含去氧孕烯/依托孕烯避孕药及斑秃药 Litfulo 更新安全性信息。"
     }
   ]
 }
