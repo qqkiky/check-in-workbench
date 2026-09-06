@@ -1,13 +1,14 @@
 {
-  "generatedAt": "2026-09-03T23:28:32+08:00",
+  "generatedAt": "2026-09-06T23:10:51+08:00",
   "months": {
     "2026-09": {
       "month": "2026-09",
-      "overview": "2026-09 共汇总 3 条宠物与医药行业资讯（行业动态 2 / 药品信息 1 / 监管动态 0）。",
+      "overview": "2026-09 共汇总 4 条宠物与医药行业资讯（行业动态 2 / 药品信息 1 / 监管动态 1）。",
       "keyPoints": [
         "为进一步提升全省基层兽医实验室检测技术水平，高质高效完成2026年春季重大动物疫病监测任务，扎实筑牢海南自由贸易港生物安全防控屏障，近期，海南省动物疫病预防控制中心在海口分两期举办全省动物疫病诊断检验技术培训班，来自全省18个市县的近50名兽医实验室技术骨干参训，通过集中培训实现专业能力提质增效。 兽医实验室检测能力是",
         "DelveInsight's PCSK9 Targeted Therapies Market Size, Target Population, Competitive Landscape & Market Forecast report includes a comprehensive understanding of",
-        "各省级兽药检验机构： 为提升省级兽药检验机构实验室检验检测水平，促进我国兽药行业健康规范发展，根据2026年培训班计划，中国兽医药品监察所拟于近期举办2026年兽药检验检测技术能力提升培训班。现就有关事项通知如下。 一、培训时间及地点 时间：9月16日至18日，会期2.5天（9月16日下午报到，9月18日下午离会）； "
+        "各省级兽药检验机构： 为提升省级兽药检验机构实验室检验检测水平，促进我国兽药行业健康规范发展，根据2026年培训班计划，中国兽医药品监察所拟于近期举办2026年兽药检验检测技术能力提升培训班。现就有关事项通知如下。 一、培训时间及地点 时间：9月16日至18日，会期2.5天（9月16日下午报到，9月18日下午离会）； ",
+        "美国 FDA 发布紧急使用授权（EUA），批准 Capstar（硝吡喃）片剂用于犬猫新世界螺旋蝇（NWS）感染（蝇蛆病）的预防与治疗，同时修订其仿制药硝吡喃片的授权。适用于体重至少 2 磅、年龄至少 4 周龄的犬、幼犬、猫和幼猫；此前硝吡喃仅被授权用于治疗，这是 FDA 首次为这一疫病的预防提供兽药选择。"
       ],
       "sections": {
         "industry": [
@@ -32,7 +33,17 @@
             "date": "2026-09-01 14:24:00"
           }
         ],
-        "regulatory": []
+        "regulatory": [
+          {
+            "title": "FDA Issues Emergency Use Authorization for Drugs to Prevent and Treat New World Screwworm in Dogs and Cats",
+            "url": "https://finance.yahoo.com/healthcare/articles/fda-issues-emergency-authorization-drugs-153700243.html",
+            "source": "FDA CVM",
+            "date": "2026-09-03",
+            "lang": "en",
+            "titleZh": "FDA 发布紧急使用授权：Capstar 及仿制硝吡喃片可用于犬猫新世界螺旋蝇病的预防与治疗",
+            "zhSummary": "美国 FDA 发布紧急使用授权（EUA），批准 Capstar（硝吡喃）片剂用于犬猫新世界螺旋蝇（NWS）感染（蝇蛆病）的预防与治疗，同时修订其仿制药硝吡喃片的授权。适用于体重至少 2 磅、年龄至少 4 周龄的犬、幼犬、猫和幼猫；此前硝吡喃仅被授权用于治疗，这是 FDA 首次为这一疫病的预防提供兽药选择。"
+          }
+        ]
       }
     },
     "2026-08": {
