@@ -1,17 +1,33 @@
 {
-  "generatedAt": "2026-09-06T23:10:51+08:00",
+  "generatedAt": "2026-09-07T21:47:38+08:00",
   "months": {
     "2026-09": {
       "month": "2026-09",
-      "overview": "2026-09 共汇总 4 条宠物与医药行业资讯（行业动态 2 / 药品信息 1 / 监管动态 1）。",
+      "overview": "2026-09 共汇总 6 条宠物与医药行业资讯（行业动态 4 / 药品信息 1 / 监管动态 1）。",
       "keyPoints": [
+        "新发布的249页《兽医诊断市场报告》覆盖15个市场的分国别预测、32家企业的竞争概况与投资级数据，重点分析 IDEXX、Zoetis、Antech、Roche 和 Thermo Fisher 等主要厂商到2030年的市场定位与竞争态势。",
+        "近年来，新疆持续推动数字技术与特色农牧业深度融合，以科技创新重塑农牧业生产模式、延伸产业链条、提升产业价值，为乡村全面振兴注入持久动力。 卫星遥感、物联网、智慧农业平台等被广泛应用于田间地头，棉花等大宗农作物实现智能化、规模化种植，智慧畜牧体系为养殖溯源装上了“数字大脑”。同时，各地立足特色农牧业资源，健全全产业链发展",
         "为进一步提升全省基层兽医实验室检测技术水平，高质高效完成2026年春季重大动物疫病监测任务，扎实筑牢海南自由贸易港生物安全防控屏障，近期，海南省动物疫病预防控制中心在海口分两期举办全省动物疫病诊断检验技术培训班，来自全省18个市县的近50名兽医实验室技术骨干参训，通过集中培训实现专业能力提质增效。 兽医实验室检测能力是",
-        "DelveInsight's PCSK9 Targeted Therapies Market Size, Target Population, Competitive Landscape & Market Forecast report includes a comprehensive understanding of",
         "各省级兽药检验机构： 为提升省级兽药检验机构实验室检验检测水平，促进我国兽药行业健康规范发展，根据2026年培训班计划，中国兽医药品监察所拟于近期举办2026年兽药检验检测技术能力提升培训班。现就有关事项通知如下。 一、培训时间及地点 时间：9月16日至18日，会期2.5天（9月16日下午报到，9月18日下午离会）； ",
         "美国 FDA 发布紧急使用授权（EUA），批准 Capstar（硝吡喃）片剂用于犬猫新世界螺旋蝇（NWS）感染（蝇蛆病）的预防与治疗，同时修订其仿制药硝吡喃片的授权。适用于体重至少 2 磅、年龄至少 4 周龄的犬、幼犬、猫和幼猫；此前硝吡喃仅被授权用于治疗，这是 FDA 首次为这一疫病的预防提供兽药选择。"
       ],
       "sections": {
         "industry": [
+          {
+            "title": "Veterinary Diagnostic Markets Report Now Available — See Exactly How IDEXX, Zoetis, Antech, Roche, and Thermo Fisher Are Positioned to Win Through 2030",
+            "url": "https://finance.yahoo.com/healthcare/articles/veterinary-diagnostic-markets-report-now-103800385.html?.tsrc=rss",
+            "source": "Yahoo Finance",
+            "date": "2026-09-07 10:38",
+            "lang": "en",
+            "titleZh": "兽医诊断市场报告发布：IDEXX、Zoetis、Antech、Roche、Thermo Fisher 面向2030年的竞争格局解析",
+            "zhSummary": "新发布的249页《兽医诊断市场报告》覆盖15个市场的分国别预测、32家企业的竞争概况与投资级数据，重点分析 IDEXX、Zoetis、Antech、Roche 和 Thermo Fisher 等主要厂商到2030年的市场定位与竞争态势。"
+          },
+          {
+            "title": "创新智造看新疆丨科技赋能绘就新疆现代农牧业新画卷",
+            "url": "http://www.ivdc.org.cn/xwdt/zhdt/202609/t20260907_83336.htm",
+            "source": "新华社",
+            "date": "2026-09-07 08:49:00"
+          },
           {
             "title": "海南：强技能 夯基础 保安全——海南省2026年动物疫病诊断检验技术培训班圆满举办",
             "url": "http://www.ivdc.org.cn/xwdt/dfxw/202609/t20260903_83330.htm",
