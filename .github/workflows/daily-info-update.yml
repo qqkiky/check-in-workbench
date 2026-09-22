@@ -1,0 +1,139 @@
+name: Daily domestic news update
+
+on:
+  schedule:
+    # GitHub cron uses UTC. 00:00 UTC = 08:00 Asia/Shanghai.
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-domestic-news-update
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      TZ: Asia/Shanghai
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Update domestic news data
+        run: |
+          set -euo pipefail
+          python scripts/gen_consult.py
+          python scripts/append_history.py
+          python scripts/gen_monthly.py
+          python scripts/gen_overseas.py
+          python scripts/gen_weekly.py
+
+      - name: Validate cumulative data
+        run: python scripts/validate_info_update.py
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Build production site
+        run: npm run build
+
+      - name: Commit generated data to main
+        id: source_commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public scripts/company_archive.json scripts/fulltext_cache.json www/archive
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: 国内资讯每日更新 $(date +%F)"
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout deployment branch
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          path: .gh-pages
+          fetch-depth: 1
+
+      - name: Publish dist to gh-pages
+        id: deploy
+        run: |
+          set -euo pipefail
+          rsync -a --delete --exclude='.git/' dist/ .gh-pages/
+          touch .gh-pages/.nojekyll
+          cd .gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: 国内资讯每日更新 $(date +%F)"
+            git push origin HEAD:gh-pages
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for GitHub Pages build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_SHA: ${{ steps.deploy.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            commit=$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest" --jq '.commit // ""' 2>/dev/null || true)
+            status=$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest" --jq '.status // ""' 2>/dev/null || true)
+            echo "Pages attempt ${attempt}: commit=${commit} status=${status}"
+            if [[ "$commit" == "$DEPLOY_SHA" && "$status" == "built" ]]; then
+              exit 0
+            fi
+            if [[ "$commit" == "$DEPLOY_SHA" && ( "$status" == "errored" || "$status" == "cancelled" ) ]]; then
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for GitHub Pages" >&2
+          exit 1
+
+      - name: Verify online data
+        env:
+          SITE_URL: https://qqkiky.github.io/check-in-workbench
+        run: |
+          set -euo pipefail
+          local_generated=$(python -c 'import json; print(json.load(open("public/consult-data.json", encoding="utf-8"))["generatedAt"])')
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error --location \
+              "${SITE_URL}/consult-data.json?run=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}" \
+              --output /tmp/online-consult-data.json; then
+              online_generated=$(python -c 'import json; print(json.load(open("/tmp/online-consult-data.json", encoding="utf-8"))["generatedAt"])')
+              echo "Online generatedAt: ${online_generated}"
+              if [[ "$online_generated" == "$local_generated" ]]; then
+                exit 0
+              fi
+            fi
+            sleep 10
+          done
+          echo "Online data did not reach generatedAt ${local_generated}" >&2
+          exit 1

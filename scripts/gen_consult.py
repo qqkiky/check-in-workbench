@@ -8,13 +8,13 @@
   - drug        药品信息（新药注册审批、公示、变更注册）
   - regulatory  监管动态（国内外监管政策/法规/指南/召回）
 
-国内源复用 pet-pharma-intel skill 的 fetch_intel.py（urllib 标准库，已实测）。
+国内源使用仓库内置的 fetch_intel.py（urllib 标准库，已实测）。
 国际源（FDA / EMA）由本脚本用 urllib 直连解析（仅读，不登录）。
 
 用法：
   python gen_consult.py            # 生成到 ../public/consult-data.json（相对本脚本）
   python gen_consult.py --out X.json
-依赖：Python 3.11+ 标准库；fetch_intel.py 路径通过 FETCH_INTEL 环境变量或默认位置解析。
+依赖：Python 3.11+ 标准库；默认调用同目录 fetch_intel.py，也可用 FETCH_INTEL 环境变量覆盖。
 """
 import argparse
 import json
@@ -29,11 +29,8 @@ from datetime import datetime, timezone, timedelta
 CST = timezone(timedelta(hours=8))
 
 PY = sys.executable
-# fetch_intel.py 默认位置（pet-pharma-intel skill）
-DEFAULT_FETCH = os.path.join(
-    os.path.expanduser("~"),
-    ".workbuddy", "skills", "pet-pharma-intel", "scripts", "fetch_intel.py"
-)
+# fetch_intel.py 已随仓库分发，GitHub Actions 与本机使用同一份实现。
+DEFAULT_FETCH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fetch_intel.py")
 FETCH_INTEL = os.environ.get("FETCH_INTEL", DEFAULT_FETCH)
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -119,6 +116,7 @@ def run_fetch_intel(out_path, days=30, limit=15):
         "--days", str(days),
         "--limit-per-source", str(limit),
         "--detail",
+        "--no-company-news",
         "--format", "json",
         "--out", out_path,
     ]
@@ -267,19 +265,26 @@ def main():
     seen = {it.get("url") for sec in existing.values() for it in sec if it.get("url")}
 
     # 1) 中文源（仅国内，外文交由 merge_foreign）
+    fetch_succeeded = False
     if run_fetch_intel(tmp, days=args.days, limit=args.limit):
         try:
             with open(tmp, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            meta = data.get("meta", {})
+            requested = set(meta.get("source_keys") or (SRC_DRUG + SRC_REGULATORY + SRC_INDUSTRY))
+            failed = {e.get("source") for e in meta.get("errors", []) if e.get("source")}
+            if requested and requested.issubset(failed):
+                raise RuntimeError("全部国内资讯源均抓取失败")
             cn = map_cn_items(data.get("items", []))
             added = 0
             for k in existing:
                 for it in cn.get(k, []):
                     if it.get("url") and it["url"] not in seen:
                         existing[k].append(it)
-                        seen.add(it["url"])
-                        added += 1
+                    seen.add(it["url"])
+                    added += 1
             print(f"[ok] 中文源新增 {added} 条")
+            fetch_succeeded = True
         except Exception as e:
             print(f"[warn] 解析 fetch_intel 输出失败: {e}", file=sys.stderr)
         finally:
@@ -288,6 +293,10 @@ def main():
             except Exception:
                 pass
 
+    if not fetch_succeeded:
+        print("[error] 国内资讯更新失败，保留现有数据文件不变", file=sys.stderr)
+        return 1
+
     sort_sections(existing)
     payload = {"generatedAt": now_iso(), "sections": existing}
     with open(out, "w", encoding="utf-8") as f:
@@ -295,7 +304,8 @@ def main():
     total = sum(len(v) for v in existing.values())
     print(f"[done] 已写入 {out} · 累计 {total} 条 "
           f"(行业{len(existing['industry'])} / 药品{len(existing['drug'])} / 监管{len(existing['regulatory'])})")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
