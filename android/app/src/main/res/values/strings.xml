@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">打卡工作台</string>
+    <string name="title_activity_main">打卡工作台</string>
+    <string name="package_name">com.workbench.checkin</string>
+    <string name="custom_url_scheme">com.workbench.checkin</string>
+</resources>

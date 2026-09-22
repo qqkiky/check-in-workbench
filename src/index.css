@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --bg-primary: #F2F2F7;
+    --bg-card: #FFFFFF;
+    --bg-elevated: #FFFFFF;
+    --text-primary: #1C1C1E;
+    --text-secondary: #8E8E93;
+    --text-tertiary: #C7C7CC;
+    --border-color: #E5E5EA;
+    --accent-color: #007AFF;
+    /* 主题色（由 src/utils/theme.ts 的 applyThemeColor 动态写入，此处为默认值，避免首屏闪烁） */
+    --primary-rgb: 79 110 247;
+    --primary-rgb-light: 128 152 252;
+    --primary-rgb-dark: 65 90 202;
+    --accent-light: #5AC8FA;
+    --danger-color: #FF3B30;
+    --success-color: #34C759;
+    --warning-color: #FF9500;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    font-family: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', -apple-system,
+      BlinkMacSystemFont, 'Noto Sans CJK SC', 'Source Han Sans SC', Helvetica,
+      Arial, sans-serif;
+    font-weight: 600;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'tnum';
+    user-select: none;
+  }
+
+  input, textarea {
+    user-select: auto;
+    -webkit-user-select: auto;
+  }
+
+  /* 原生时间/日期输入：系统深色模式/Android WebView 下默认白字，叠在浅色卡片上看不见。
+     强制 light 配色 + 深色文字；-webkit-text-fill-color 用于覆盖 WebView 对控件值的填充色。
+     确保日/周视图打卡页、时间线、记账的时钟字清晰可读。 */
+  input[type='time'],
+  input[type='date'],
+  input[type='datetime-local'] {
+    color-scheme: light;
+    color: #1c1c1e !important;
+    -webkit-text-fill-color: #1c1c1e !important;
+    caret-color: #1c1c1e !important;
+  }
+
+  /* 滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white rounded-2xl shadow-card;
+  }
+
+  .ios-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    @apply rounded-2xl;
+  }
+
+  .pill-tab {
+    @apply px-3 py-1 text-sm font-medium rounded-full transition-all;
+  }
+
+  .pill-tab-active {
+    @apply bg-primary text-white shadow-sm;
+  }
+
+  .pill-tab-inactive {
+    @apply text-gray-600 hover:bg-gray-100;
+  }
+
+  .tag-chip {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
+  }
+
+  .ios-list {
+    @apply bg-white rounded-2xl divide-y divide-gray-100;
+  }
+
+  .ios-list-item {
+    @apply px-4 py-3 flex items-center justify-between active:bg-gray-50 transition-colors;
+  }
+
+  .nav-button {
+    @apply flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-gray-500 transition-colors;
+  }
+
+  .nav-button-active {
+    @apply text-primary;
+  }
+}
+
+@layer utilities {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-area-pt {
+    padding-top: max(env(safe-area-inset-top, 0), 1rem);
+  }
+
+  .safe-area-pb {
+    padding-bottom: max(env(safe-area-inset-bottom, 0), 1rem);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* iOS 风格按钮按下反馈 */
+button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* 打卡完成动画 */
+@keyframes checkmark-pop {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.checkmark-pop {
+  animation: checkmark-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* 进度条过渡 */
+.progress-bar-fill {
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 撤销 Toast 倒计时进度条 */
+@keyframes toast-countdown {
+  from { width: 100%; }
+  to { width: 0%; }
+}

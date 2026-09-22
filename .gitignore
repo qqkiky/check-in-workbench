@@ -1,0 +1,52 @@
+node_modules
+dist
+.DS_Store
+*.local
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+
+# Local workspace state
+.workbuddy/
+_tmp*.json
+.lt_known_hosts
+
+# Local tools and generated cache
+cloudflared.exe
+scripts/__pycache__/
+*.pyc
+vite.config.ts.timestamp-*.mjs
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Android
+android/.gradle
+android/local.properties
+android/app/build
+android/build
+android/app/release
+android/app/debug
+*.keystore
+!debug.keystore
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cache
+.eslintcache
+.parcel-cache
+.cache
+
+# 本地预览日志
+preview-server*.log

@@ -1,0 +1,26 @@
+{
+  "name": "期待 · 今日小组件",
+  "short_name": "期待组件",
+  "description": "桌面一键查看今日待办与打卡进度",
+  "lang": "zh-CN",
+  "start_url": "./widget.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F2F7",
+  "theme_color": "#3B82F6",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

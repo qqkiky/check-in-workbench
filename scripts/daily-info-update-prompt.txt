@@ -1,0 +1,11 @@
+每日资讯自动更新任务。请在打卡工作台项目（C:\Users\zqkik\Documents\ChatGPT\打卡工作台）完成以下工作，并在最后用中文输出简短汇报：
+
+1. 运行资讯生成脚本。用本机可用的 Python（已知路径 C:\Users\zqkik\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe，若失效则查找其他可用 python）依次执行：
+   - scripts/gen_consult.py（中文源抓取，累积模式，勿用 --reset）
+   - scripts/gen_monthly.py、scripts/gen_overseas.py、scripts/gen_weekly.py
+2. 海外资讯：搜索 FDA/EMA/Yahoo 等自上次更新以来的新增外文条目并翻译成中文（titleZh / zhSummary），合并进 public/consult-data.json（参考 scripts/merge_foreign.py 的逻辑与既有条目格式，url 去重）；当天确无新增或抓取受限时注明即可，绝不破坏已有数据。合并用的临时文件 scripts/_foreign.json 用完后删除。
+3. 执行 npm run build 重新构建 dist。
+4. 部署上线：优先读取 %APPDATA%\GitHub CLI\hosts.yml 中的 oauth_token；若该文件中没有令牌，则改用系统凭据中同一账号（qqkiky）的令牌（运行 gh auth token 获取，不要尝试其他账号）；仅当两者都不可用时才停下来说明。通过 GitHub API 把 dist/ 上传到 qqkiky/check-in-workbench 的 gh-pages 分支（整树原子提交：git/blobs → git/trees → git/commits → PATCH git/refs/heads/gh-pages），然后等待 Pages 构建完成。
+5. 验证线上 https://qqkiky.github.io/check-in-workbench/consult-data.json 的 generatedAt 与各板块条数确已更新。
+6. 把本次数据与脚本改动提交到本地 git，提交信息注明当天日期（如"资讯每日更新 2026-XX-XX"）。
+7. 汇报内容：各板块条数（行业/药品/监管）、本次新增数量、线上 generatedAt、部署是否成功；任一环节失败请说明原因和后续建议。
