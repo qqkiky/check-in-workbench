@@ -1,9 +1,9 @@
 {
   "weekStart": "2026-08-23",
-  "weekEnd": "2026-08-23",
-  "daysCovered": 1,
-  "generatedAt": "2026-09-07T21:47:39+08:00",
-  "overview": "本周（统计周期 2026-08-23 ~ 2026-08-23，覆盖 1 天）共汇总 30 条宠物与医药行业资讯，其中行业动态 16 条、药品信息 6 条、监管动态 8 条。",
+  "weekEnd": "2026-09-23",
+  "daysCovered": 2,
+  "generatedAt": "2026-09-23T22:01:42+08:00",
+  "overview": "本周（统计周期 2026-08-23 ~ 2026-09-23，覆盖 2 天）共汇总 80 条宠物与医药行业资讯，其中行业动态 41 条、药品信息 22 条、监管动态 17 条。",
   "highlights": [
     "FDA 最终确定指南：依据抗菌药对人医重要性评估动物用抗菌药安全性",
     "FDA 公布 2027 财年 ADUFA 与 AGDUFA 动物药品用户收费标准",
@@ -145,6 +145,196 @@
         "url": "http://www.ivdc.org.cn/xwdt/zhdt/202607/t20260728_79504.htm",
         "source": "新华社",
         "date": "2026-07-28 08:17:00"
+      },
+      {
+        "title": "福建：“四位一体”推进农兽药综合整治工作",
+        "summary": "为深入落实农兽药领域综合整治工作部署，进一步净化农资市场，筑牢农产品质量安全防线，守护群众“舌尖上的安全”，福建省宁德市农业农村局着力构建普法宣传、数据监管、现场检查、突击暗访四位一体工作机制，打通日常监管工作的堵点、难点和弱点，有效推进农兽药领域全域、全链条综合整治。截至目前，宁德市发出限期责令整改通知书86份，立案",
+        "url": "http://www.ivdc.org.cn/xwdt/dfxw/202609/t20260923_83526.htm",
+        "source": "福建省农业农村厅",
+        "date": "2026-09-23 13:53:00"
+      },
+      {
+        "title": "四川：自贡市大安区三措并举推进农药兽药生产经营使用综合整治",
+        "summary": "为深入贯彻落实农业农村部及省市关于深入推进农药兽药生产经营使用综合整治的工作部署，切实筑牢农产品质量安全底线，自贡市大安区自2026年7月起在全区范围内全面启动农药兽药生产经营使用全链条综合整治行动，以“定职责+深排查+严执法”的监管组合拳，全力守护农产品质量安全。 高位部署明责，凝聚共识守底线。区农业农村局统筹牵头全",
+        "url": "http://www.ivdc.org.cn/xwdt/dfxw/202609/t20260923_83525.htm",
+        "source": "四川省农业农村厅",
+        "date": "2026-09-23 13:50:00"
+      },
+      {
+        "title": "农业农村部召开全国“三秋”农业生产工作视频会议强调全力以赴抓好当前农业生产各项工作 奋力夺取全年粮食和农业丰收",
+        "summary": "农业农村部召开全国“三秋”农业生产工作视频会议。会议强调，要深入学习贯彻习近平总书记重要指示精神，落实党中央、国务院决策部署，全力以赴抓好“三秋”农业生产，奋力夺取全年粮食和农业丰收，不误农时推进秋冬种，打牢明年粮油丰收基础。农业农村部党组书记、部长张柱出席会议并讲话。 会议指出，今年是“十五五”开局之年，夺取全年粮食",
+        "url": "http://www.ivdc.org.cn/xwdt/zhdt/202609/t20260922_83371.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-22 08:21:00"
+      },
+      {
+        "title": "农业农村部农药兽药综合整治专班召开农药兽药互联网第三方交易平台座谈会",
+        "summary": "农业农村部农药兽药综合整治专班组织召开农药兽药网络经营平台座谈会，通报进一步规范农药兽药生产经营使用综合整治背景和进展情况，宣贯网售农药兽药相关法律法规，交流农药兽药网络经营存在的问题，部署进一步规范网络经营秩序有关工作。 会议指出，综合整治行动开展以来，有关网络交易平台积极开展自查自纠，在禁限用农药兽药信息清理、违规",
+        "url": "http://www.ivdc.org.cn/xwdt/zhdt/202609/t20260920_83367.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-20 08:29:00"
+      },
+      {
+        "title": "江苏：2026年全国兽医化验员检测技能竞赛江苏省选拔赛在泰州举办",
+        "summary": "9月9日至11日，为期三天的全国兽医化验员检测技能竞赛江苏省选拔赛在江苏农牧科技职业学院顺利开赛。全省市、县疫控系统兽医实验室的39名检测精兵同台竞技，角逐全国竞赛“入场券”。 本次选拔赛旨在深入贯彻落实农业农村部关于举办全国兽医化验员检测技能竞赛的部署要求，扎实筑牢全省动物疫病检测技术根基，锻造高素质、专业化兽医化验",
+        "url": "http://www.ivdc.org.cn/xwdt/dfxw/202609/t20260918_83363.htm",
+        "source": "江苏省农业农村厅",
+        "date": "2026-09-18 08:41:00"
+      },
+      {
+        "title": "西藏：我区开展“三农”政策培训",
+        "summary": "习近平总书记强调，要坚持把解决好“三农”问题作为全党工作重中之重，以乡村全面振兴夯实中国式现代化的底座，对新任领导干部要加强政策培训，增强做好“三农”工作的能力。按照自治区党委书记王君正关于领导干部到党校作报告的指示要求，为不断提升教学培训的针对性和实效性，经自治区党委党校与自治区农业农村厅共同协商，7月15日，自治区",
+        "url": "http://www.ivdc.org.cn/xwdt/dfxw/202609/t20260918_83362.htm",
+        "source": "西藏自治区农业农村厅",
+        "date": "2026-09-18 08:37:00"
+      },
+      {
+        "title": "农业农村部党组召开2026年巡视动员部署会强调 高质量开展内部巡视监督为“十五五”加快农业农村现代化良好开局提供坚强政治保障",
+        "summary": "农业农村部党组召开2026年巡视动员部署会。会议强调，要深入学习贯彻习近平党建思想和党中央关于巡视工作的部署要求，高质量开展内部巡视监督，持续巩固拓展树立和践行正确政绩观学习教育成果，强化以巡促改、以巡促建、以巡促治，为“十五五”加快农业农村现代化良好开局提供坚强政治保障。部党组书记、部长张柱出席会议并讲话。驻部纪检监",
+        "url": "http://www.ivdc.org.cn/xwdt/zhdt/202609/t20260916_83357.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-16 08:12:00"
+      },
+      {
+        "title": "内蒙古：科技赋能布病防控 四级联动筑牢人畜共患病防线——内蒙古自治区动物疫病预防控制中心开展人畜共患病防控知识科普能力提升与“知信行”调查专项行动",
+        "summary": "2026年9月2日,内蒙古自治区动物疫病预防控制中心联合包头市动物疫病预防控制中心、达茂旗动物疫病预防控制中心赴达茂旗石宝镇开展布病等人畜共患病防控科普能力提升及“知信行”调查专项活动。 活动过程中,组织60余人观看科普影片《选择》、开展了专家专题讲座,进行了面对面答疑互动,收到问卷调查表30余份、发放人畜共患病防控干",
+        "url": "http://www.ivdc.org.cn/xwdt/dfxw/202609/t20260911_83349.htm",
+        "source": "内蒙古自治区农牧厅",
+        "date": "2026-09-11 09:28:00"
+      },
+      {
+        "title": "加大多元投入力度 强化政策协同联动 加快完善乡村振兴投入机制——农业农村部有关负责人解读《坚持农业农村优先发展、完善乡村振兴投入机制实施方案》",
+        "summary": "本网讯 近日，经中央深改委审议通过，农业农村部、中央农办、国家发展改革委、财政部、中国人民银行、金融监管总局联合印发《坚持农业农村优先发展、完善乡村振兴投入机制实施方案》（以下简称《方案》）。农业农村部有关负责人就《方案》进行了解读。 问：请介绍一下《方案》出台的背景。 答：党中央、国务院高度重视“三农”工作。2025",
+        "url": "http://www.ivdc.org.cn/xwdt/zhdt/202609/t20260908_83340.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-08 08:32:00"
+      },
+      {
+        "title": "Veterinary Diagnostic Markets Report Now Available — See Exactly How IDEXX, Zoetis, Antech, Roche, and Thermo Fisher Are Positioned to Win Through 2030",
+        "summary": "249-Page Report Delivers Country-by-Country Forecasts Across 15 Markets, Competitive Profiles of 32 Companies, and the Investment-Grade Data You Need to Act Wit",
+        "url": "https://finance.yahoo.com/healthcare/articles/veterinary-diagnostic-markets-report-now-103800385.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-09-07 10:38",
+        "lang": "en",
+        "titleZh": "兽医诊断市场报告发布：IDEXX、Zoetis、Antech、Roche、Thermo Fisher 面向2030年的竞争格局解析",
+        "zhSummary": "新发布的249页《兽医诊断市场报告》覆盖15个市场的分国别预测、32家企业的竞争概况与投资级数据，重点分析 IDEXX、Zoetis、Antech、Roche 和 Thermo Fisher 等主要厂商到2030年的市场定位与竞争态势。"
+      },
+      {
+        "title": "创新智造看新疆丨科技赋能绘就新疆现代农牧业新画卷",
+        "summary": "近年来，新疆持续推动数字技术与特色农牧业深度融合，以科技创新重塑农牧业生产模式、延伸产业链条、提升产业价值，为乡村全面振兴注入持久动力。 卫星遥感、物联网、智慧农业平台等被广泛应用于田间地头，棉花等大宗农作物实现智能化、规模化种植，智慧畜牧体系为养殖溯源装上了“数字大脑”。同时，各地立足特色农牧业资源，健全全产业链发展",
+        "url": "http://www.ivdc.org.cn/xwdt/zhdt/202609/t20260907_83336.htm",
+        "source": "新华社",
+        "date": "2026-09-07 08:49:00"
+      },
+      {
+        "title": "海南：强技能 夯基础 保安全——海南省2026年动物疫病诊断检验技术培训班圆满举办",
+        "summary": "为进一步提升全省基层兽医实验室检测技术水平，高质高效完成2026年春季重大动物疫病监测任务，扎实筑牢海南自由贸易港生物安全防控屏障，近期，海南省动物疫病预防控制中心在海口分两期举办全省动物疫病诊断检验技术培训班，来自全省18个市县的近50名兽医实验室技术骨干参训，通过集中培训实现专业能力提质增效。 兽医实验室检测能力是",
+        "url": "http://www.ivdc.org.cn/xwdt/dfxw/202609/t20260903_83330.htm",
+        "source": "海南省农业农村厅",
+        "date": "2026-09-03 13:48:00"
+      },
+      {
+        "title": "The Oral PCSK9 Inhibitor Market Enters High-Growth Phase Owing to the Approval of Merck's LIPFENDRA and the Emergence of Oral PCSK9 Inhibitor Drugs, Including, AstraZeneca's AZD0780, Aqur's AQR-008, and Others | DelveInsight",
+        "summary": "DelveInsight's PCSK9 Targeted Therapies Market Size, Target Population, Competitive Landscape & Market Forecast report includes a comprehensive understanding of",
+        "url": "https://finance.yahoo.com/healthcare/articles/oral-pcsk9-inhibitor-market-enters-143100912.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-09-01 14:31"
+      },
+      {
+        "title": "IDEXX Laboratories to Participate in Morgan Stanley 24th Annual Global Healthcare Conference",
+        "summary": "WESTBROOK, Maine, August 31, 2026--IDEXX Laboratories, Inc. (Nasdaq: IDXX), a global leader in pet healthcare innovation, today announced that Mike Erickson, Pr",
+        "url": "https://finance.yahoo.com/healthcare/articles/idexx-laboratories-participate-morgan-stanley-180000251.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-08-31 18:00"
+      },
+      {
+        "title": "Elanco Scales Biologics Capabilities With Expansion of Kansas Manufacturing Facility",
+        "summary": "The completed 25,000-square-foot Elwood site expansion bolsters 's monoclonal antibody (mAb) production; supports delivery of next-generation pipelineINDIANAPOL",
+        "url": "https://finance.yahoo.com/healthcare/articles/elanco-scales-biologics-capabilities-expansion-133000271.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-08-31 13:30"
+      },
+      {
+        "title": "农业农村部召开树立和践行正确政绩观学习教育总结会议",
+        "summary": "农业农村部召开树立和践行正确政绩观学习教育总结会议，中央第十指导组组长钟山，农业农村部党组书记、部长张柱出席会议并讲话。农业农村部党组成员、副部长张治礼主持会议并传达习近平总书记重要指示和中央党的建设工作领导小组会议精神，中央第十指导组副组长王令浚出席会议。 钟山强调，学习教育开展以来，农业农村部党组深入学习领会习近平",
+        "url": "http://www.ivdc.org.cn/xwdt/zhdt/202608/t20260831_82525.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-31 08:24:00"
+      },
+      {
+        "title": "农业农村部召开部务会传达学习国务院全体会议精神 审议农业农村有关规章",
+        "summary": "本网讯 8月28日，农业农村部召开部务会，部党组书记、部长张柱主持。 会议传达学习国务院全体会议精神，研究贯彻落实工作。会议强调，今年以来，农业农村发展保持稳中有进、稳中向好势头，为推动经济向新向优向好发展提供了基础支撑，但也面临一些困难挑战。要认真落实中央政治局会议精神和国务院全体会议要求，切实把思想和行动统一到党中",
+        "url": "http://www.ivdc.org.cn/xwdt/zhdt/202608/t20260831_82524.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-31 08:22:00"
+      },
+      {
+        "title": "国务院食安办、农业农村部、市场监管总局指导地方快速处置“白菜收购环节蘸取甲醛溶液”问题",
+        "summary": "国务院食安办、农业农村部、市场监管总局高度重视，第一时间指导属地调查核实，依法从严从快处置，对涉事白菜流向进行追查，严防问题产品流入市场。同时举一反三，组织各地立即开展白菜等易腐蔬菜专项抽检和市场排查，一旦发现违法违规行为，将严惩重处、决不姑息，切实维护人民群众饮食安全。 相关链接 农业农村部 中国兽药协会 部属事业单",
+        "url": "http://www.ivdc.org.cn/xwdt/zhdt/202608/t20260828_82523.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-28 14:33:00"
+      },
+      {
+        "title": "河北：2026年全国兽医化验员检测技能竞赛河北省选拔赛在石家庄举办",
+        "summary": "为切实提升全省兽医实验室检测技术水平，积极备战2026年全国兽医化验员检测技能竞赛，8月17日-20日，河北省动物疫病预防控制中心在石家庄举办了2026年全国兽医化验员检测技能竞赛河北省选拔赛。本次选拔赛13名选手均为近三届河北省兽医化验员技能竞赛一、二、三等奖获得者，具备扎实的理论功底和娴熟的实操能力，有效保障了选拔",
+        "url": "http://www.ivdc.org.cn/xwdt/dfxw/202608/t20260828_82520.htm",
+        "source": "河北省农业农村厅",
+        "date": "2026-08-28 09:03:00"
+      },
+      {
+        "title": "Elanco celebrates $120 million expansion of Elwood manufacturing facility",
+        "summary": "ELWOOD, Kan. (News-Press NOW) — Elanco Animal Health recently completed a $120 million expansion of its Elwood manufacturing facility, quadrupling production ca",
+        "url": "https://www.newspressnow.com/news/local_news/business/elanco-celebrates-120-million-expansion-of-elwood-manufacturing-facility/article_aab7c734-f5db-4155-9b91-fd9d0e3444e0.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-08-27 03:59"
+      },
+      {
+        "title": "Zoetis Wins Emergency Authorization for Simparica Trio, Can It Support a Slowing U.S. Business?",
+        "summary": "The timing of Zoetis Inc.’s (NYSE:ZTS) latest regulatory win is particularly relevant for shareholders. Just one week after the animal-health company reported a",
+        "url": "https://finance.yahoo.com/healthcare/articles/zoetis-wins-emergency-authorization-simparica-002957471.html?.tsrc=rss",
+        "source": "Yahoo Finance",
+        "date": "2026-08-24 00:29"
+      },
+      {
+        "title": "Michael Burry-Backed ZTS Stock Climbs Following FDA Green Light For Dog Pill Against Screwworm",
+        "summary": "",
+        "url": "https://finance.yahoo.com/m/a7b0fc1b-97e6-3a52-93d1-a503c0373210/michael-burry-backed-zts.html",
+        "source": "Yahoo Finance",
+        "date": "2026-08-19",
+        "lang": "en",
+        "titleZh": "FDA 批准犬用驱虫药紧急使用，Michael Burry 持仓的 Zoetis 股价上涨",
+        "zhSummary": "FDA 授权 Zoetis 的 Simparica TRIO 用于治疗犬新世界螺旋蝇蛆病，消息推动 ZTS 股价上涨约 3%。"
+      },
+      {
+        "title": "ZTS Q2 Earnings Call Flags Deeper Companion Animal Pressure",
+        "summary": "",
+        "url": "https://finance.yahoo.com/healthcare/articles/zts-q2-earnings-call-flags-140000848.html",
+        "source": "Yahoo Finance",
+        "date": "2026-08-12",
+        "lang": "en",
+        "titleZh": "Zoetis 二季度财报电话会凸显伴侣动物业务承压加深",
+        "zhSummary": "Zoetis 二季度伴侣动物业务全球收入有机下滑 6%、美国下滑 11%，皮肤病与驱虫药竞争加剧，公司下调全年指引。"
+      },
+      {
+        "title": "Zoetis cuts annual forecasts as pet healthcare demand slows",
+        "summary": "",
+        "url": "https://finance.yahoo.com/healthcare/articles/zoetis-cuts-annual-forecasts-pet-121132124.html",
+        "source": "Yahoo Finance",
+        "date": "2026-08-06",
+        "lang": "en",
+        "titleZh": "Zoetis 因宠物医疗需求放缓下调全年业绩预期",
+        "zhSummary": "因伴侣动物门诊量下降、宠物主价格敏感及竞争加剧，Zoetis 下调 2026 年营收与盈利指引，二季度营收不及预期。"
+      },
+      {
+        "title": "Zoetis Launches Lenivia (izenivetmab injection) in Canada and the European Union",
+        "summary": "",
+        "url": "https://finance.yahoo.com/healthcare/articles/zoetis-launches-lenivia-izenivetmab-injection-123000377.html",
+        "source": "Yahoo Finance",
+        "date": "2026-07-15",
+        "lang": "en",
+        "titleZh": "Zoetis 在加拿大与欧盟上市 Lenivia（伊泽尼单抗注射液）",
+        "zhSummary": "Zoetis 推出犬骨关节炎长效单克隆抗体疗法 Lenivia，单次皮下注射可提供长达三个月的疼痛缓解。"
       }
     ],
     "drug": [
@@ -189,6 +379,118 @@
         "url": "http://www.ivdc.org.cn/xxgk/zcfg/nyncbgg/202607/t20260730_79529.htm",
         "source": "农业农村部网站",
         "date": "2026-07-30 13:37:00"
+      },
+      {
+        "title": "农业农村部畜牧兽医局关于对兽药临床试验质量管理规范监督检查结果的公示",
+        "summary": "近日，按照《兽药管理条例》、《兽药临床试验质量管理规范》、《兽药非临床研究与临床试验质量管理规范监督检查办法》以及监督检查相关要求，我局组织中国兽医药品监察所对首次申请成为兽药临床试验机构的广州市华南农大生物药品有限公司2个试验项目，实施了兽药临床试验质量管理规范（以下简称兽药“GCP”）监督检查（见附件），检查结果基",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/gg/202609/t20260921_83370.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-21 13:34:00"
+      },
+      {
+        "title": "农业农村部办公厅关于2026年第二期兽药质量监督抽检情况的通报",
+        "summary": "为加强兽药质量监管，根据《2026年兽药质量监督抽检和风险监测计划》安排，我部组织对兽药生产、经营和使用单位进行兽药质量监督抽检，同时对日常监管中发现存在风险隐患生产企业的相关兽药产品进行跟踪检验。现将2026年上半年监督抽检有关情况通报如下。 一、总体情况 部级监督抽检兽用生物制品19批，全部合格；省级监督抽检不合格",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202609/t20260918_83365.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-18 13:41:00"
+      },
+      {
+        "title": "中国兽医药品监察所关于征求《动物氧疗舱》农业行业标准意见的函",
+        "summary": "各有关单位和专家： 根据农业行业标准制修订工作计划，由中国兽医药品监察所牵头、会同有关单位编制的《动物氧疗舱》已完成征求意见稿（见附件1）。请各单位全面审阅并提出具体修改意见，同步填写《征求意见反馈表》（见附件2），并于2026年10月14日前通过电子邮件形式反馈。 联系人及电话：王飞虎、王谷怡，62103951、62",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202609/t20260918_83361.htm",
+        "source": "中国兽医药品监察所",
+        "date": "2026-09-18 08:28:00"
+      },
+      {
+        "title": "中国兽医药品监察所关于征集农业农村部兽医器械标准化技术委员会委员的通知",
+        "summary": "各有关单位： 农业农村部兽医器械标准化技术委员会（以下简称“标委会”）已经农业农村部农产品质量安全监管司批准组建，主要负责兽医器械相关质量控制、检验检测、监督管理、包装标识等领域行业标准制修订、宣贯实施、效果评价和评审等工作。中国兽医药品监察所负责标委会秘书处工作。根据《农业农村部标准化管理办法》、《农业农村部专业标准",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202609/t20260916_83358.htm",
+        "source": "中国兽医药品监察所",
+        "date": "2026-09-16 09:34:00"
+      },
+      {
+        "title": "中国兽医药品监察所关于举办兽用中化药注册评审与质量控制要求培训班的预通知",
+        "summary": "中国兽医药品监察所关于举办兽用中化药注册评审与质量控制要求培训班的预通知.pdf 相关链接 农业农村部 中国兽药协会 部属事业单位 农业农村部机关服务中心( 农业农村部机关服务局) 中国农业科学院 中国水产科学研究院 中国热带农业科学院 全国农业展览馆（中国农业博物馆） 中国农业电影电视中心 农民日报社 中国农业出版社",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202609/t20260914_83355.htm",
+        "source": "中国兽医药品监察所",
+        "date": "2026-09-14 15:55:00"
+      },
+      {
+        "title": "农业农村部公告 第1062号（批准17种产品的新兽药注册；批准6种兽药产品注册；批准2种兽药产品变更注册）",
+        "summary": "根据《兽药管理条例》和《兽药注册办法》规定，经审查，批准氟雷拉纳等17种兽药产品为新兽药，核发《新兽药注册证书》，发布产品质量标准、工艺规程、说明书、标签、日允许摄入量和最大残留限量标准（试行），自发布之日起执行。 批准犬、猫狂犬病病毒抗体胶体金检测试纸条等6种兽药产品注册，发布产品质量标准、工艺规程、说明书和标签，自",
+        "url": "http://www.ivdc.org.cn/xxgk/zcfg/nyncbgg/202609/t20260914_83352.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-14 09:25:00"
+      },
+      {
+        "title": "农业农村部关于印发《全国畜牧兽医行业发展“十五五”规划》的通知",
+        "summary": "农业农村部关于印发《全国畜牧兽医行业发展“十五五”规划》的通知.pdf 相关链接 农业农村部 中国兽药协会 部属事业单位 农业农村部机关服务中心( 农业农村部机关服务局) 中国农业科学院 中国水产科学研究院 中国热带农业科学院 全国农业展览馆（中国农业博物馆） 中国农业电影电视中心 农民日报社 中国农业出版社（农村读物",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202609/t20260911_83350.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-11 10:17:00"
+      },
+      {
+        "title": "农业农村部畜牧兽医局关于公开征求《关于进一步做好含替来他明兽药监管工作的通知》意见的通知",
+        "summary": "农业农村部畜牧兽医局关于公开征求《关于进一步做好含替来他明兽药监管工作的通知》意见的通知 各有关单位： 为进一步规范含替来他明兽药产品各环节监管，防止合法兽药产品作为毒品被滥用，我部拟会同有关部门制定印发《关于进一步做好含替来他明兽药监管工作的通知》。按照规范性文件制发程序要求，现公开征求意见。请于9月16日前将意见建",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202609/t20260910_83347.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-10 08:26:00"
+      },
+      {
+        "title": "农业农村部公告 第1059号（批准4种兽药产品在我国再注册、变更注册）",
+        "summary": "农业农村部公告 第1059号说明书和标签.pdf 相关链接 农业农村部 中国兽药协会 部属事业单位 农业农村部机关服务中心( 农业农村部机关服务局) 中国农业科学院 中国水产科学研究院 中国热带农业科学院 全国农业展览馆（中国农业博物馆） 中国农业电影电视中心 农民日报社 中国农业出版社（农村读物出版社） 中国农村杂志",
+        "url": "http://www.ivdc.org.cn/xxgk/zcfg/nyncbgg/202609/t20260909_83344.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-09 08:22:00"
+      },
+      {
+        "title": "兽药综合业务咨询服务窗口9月份“所长接待日”工作安排",
+        "summary": "兽药综合业务咨询服务窗口（中监所本部生药楼大厅一层）。 三、受理范围。兽药注册评审相关问题（新兽药注册、变更注册、申报资料要求、技术评审共性疑难问题等），具体参照《农业农村部兽药评审中心关于进一步优化兽药研发注册咨询问题答复工作的通告》相关要求。 四、有关要求。咨询交流实行预约制，申请人应提前3个工作日填写《“面对面”",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202609/t20260909_83343.htm",
+        "source": "中国兽医药品监察所",
+        "date": "2026-09-09 08:07:00"
+      },
+      {
+        "title": "农业农村部公告 第1061号（制定、修订28个兽药研究技术指导原则）",
+        "summary": "为进一步加强新兽药研究技术指导工作，加快兽药产品研发和上市应用，根据《兽药管理条例》等有关规定，我部组织制定、修订了《兽药安全药理学研究技术指导原则》等28个兽药研究技术指导原则，现予发布，请参照执行。农业部公告第1247号、农业部公告第1596号同时废止。 本公告发布之日起，新制定、修订、废止兽药研究技术指导原则，由",
+        "url": "http://www.ivdc.org.cn/xxgk/zcfg/nyncbgg/202609/t20260908_83342.htm",
+        "source": "农业农村部网站",
+        "date": "2026-09-08 15:35:00"
+      },
+      {
+        "title": "中国兽医药品监察所关于举办2026年兽药检验检测能力提升培训班的通知",
+        "summary": "各省级兽药检验机构： 为提升省级兽药检验机构实验室检验检测水平，促进我国兽药行业健康规范发展，根据2026年培训班计划，中国兽医药品监察所拟于近期举办2026年兽药检验检测技术能力提升培训班。现就有关事项通知如下。 一、培训时间及地点 时间：9月16日至18日，会期2.5天（9月16日下午报到，9月18日下午离会）； ",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202609/t20260901_82534.htm",
+        "source": "中国兽医药品监察所",
+        "date": "2026-09-01 14:24:00"
+      },
+      {
+        "title": "农业农村部畜牧兽医局关于公开征求国家突发重大动物疫情应急预案意见的通知",
+        "summary": "根据全国突发重大动物疫情应急处置工作需要，我局组织制定了《国家突发重大动物疫情应急预案（征求意见稿）》，现公开征求意见。可通过以下途径和方式提出意见和建议。 一、将意见建议发送电子邮件至：cadcfkyjc@163.com、syjfyc@163.com。 二、将意见建议通过传真反馈：010-59194623、59192",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202608/t20260831_82527.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-31 08:34:00"
+      },
+      {
+        "title": "农业农村部畜牧兽医局关于公布兽药非临床研究质量管理规范和兽药临床试验质量管理规范监督检查结果（第六十一批）的通知",
+        "summary": "各省、自治区、直辖市农业农村（农牧）、畜牧兽医厅（局、委），新疆生产建设兵团农业农村局，中国兽医药品监察所： 为规范兽药研究活动，根据《兽药管理条例》、《兽药非临床研究质量管理规范》、《兽药临床试验质量管理规范》以及有关监督检查办法和标准要求，我局组织中国兽医药品监察所对赣南创新与转化医学研究院等3家单位进行了监督检查",
+        "url": "http://www.ivdc.org.cn/xxgk/ggtz/tz/202608/t20260831_82526.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-31 08:29:00"
+      },
+      {
+        "title": "农业农村部公告 第1057号（批准氟雷拉纳等5种兽药产品为新兽药）",
+        "summary": "根据《兽药管理条例》 和 《兽药注册办法》规定，经审查， 批准氟雷拉纳 等 5 种兽药产品 为新兽药， 核发《新兽药注册证书》，发布产品质量标准、工艺规程、说明书和标签，自发布之日起执行。 批准猪圆环病毒 2 型、 3 型二重荧光 PCR 检测试剂盒 等 3 种兽药产品 注册 ，发布产品质量标准、工艺规程、说明书和标签",
+        "url": "http://www.ivdc.org.cn/xxgk/zcfg/nyncbgg/202608/t20260828_82522.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-28 12:52:00"
+      },
+      {
+        "title": "农业农村部公告 第1055号（批准氟雷拉纳莫昔克丁滴剂等14种兽药产品为新兽药）",
+        "summary": "根据《兽药管理条例》和《兽药注册办法》规定，经审查，批准氟雷拉纳莫昔克丁滴剂等14种兽药产品为新兽药，核发《新兽药注册证书》，发布产品质量标准、工艺规程、说明书和标签，自发布之日起执行。 批准非洲猪瘟病毒抗体检测试纸条等2种兽药产品注册，发布产品质量标准、工艺规程、说明书和标签，自发布之日起执行。 批准鸡新城疫、禽流感",
+        "url": "http://www.ivdc.org.cn/xxgk/zcfg/nyncbgg/202608/t20260824_82509.htm",
+        "source": "农业农村部网站",
+        "date": "2026-08-24 10:19:00"
       }
     ],
     "regulatory": [
@@ -271,6 +573,96 @@
         "lang": "en",
         "titleZh": "EMA 新领导团队任命",
         "zhSummary": "欧洲药品管理局（EMA）公布新一届领导团队成员任命。"
+      },
+      {
+        "title": "FDA Issues Emergency Use Authorization for Drugs to Prevent and Treat New World Screwworm in Dogs and Cats",
+        "summary": "The U.S. Food and Drug Administration today issued an Emergency Use Authorization (EUA) for Capstar (nitenpyram) tablets and revised the EUA for Nitenpyram Tabl",
+        "url": "https://finance.yahoo.com/healthcare/articles/fda-issues-emergency-authorization-drugs-153700243.html",
+        "source": "FDA CVM",
+        "date": "2026-09-03",
+        "lang": "en",
+        "titleZh": "FDA 发布紧急使用授权：Capstar 及仿制硝吡喃片可用于犬猫新世界螺旋蝇病的预防与治疗",
+        "zhSummary": "美国 FDA 发布紧急使用授权（EUA），批准 Capstar（硝吡喃）片剂用于犬猫新世界螺旋蝇（NWS）感染（蝇蛆病）的预防与治疗，同时修订其仿制药硝吡喃片的授权。适用于体重至少 2 磅、年龄至少 4 周龄的犬、幼犬、猫和幼猫；此前硝吡喃仅被授权用于治疗，这是 FDA 首次为这一疫病的预防提供兽药选择。"
+      },
+      {
+        "title": "CVM GFI #152 Evaluating the Safety of Antimicrobial New Animal Drugs with Regard to Their Microbiological Effects on Bacteria of Human Health Concern",
+        "summary": "",
+        "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/cvm-gfi-152-evaluating-safety-antimicrobial-new-animal-drugs-regard-their-microbiological-effects",
+        "source": "FDA CVM",
+        "date": "2026-08-05",
+        "lang": "en",
+        "titleZh": "CVM 指南 GFI #152——评估抗菌类新兽药的微生物学安全性（对人医关切细菌的影响）",
+        "zhSummary": "FDA 发布 GFI #152 指南，指导评估抗菌新兽药对人医关切细菌的微生物学影响安全性。"
+      },
+      {
+        "title": "American Regent, Inc. Animal Health Issues Nationwide Recall of Two Lots of Adequan® Canine and Two Lots of Adequan® I.M. Due to Visible Glass Fiber Material in the Product",
+        "summary": "",
+        "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/american-regent-inc-animal-health-issues-nationwide-recall-two-lots-adequanr-canine-and-two-lots",
+        "source": "FDA CVM",
+        "date": "2026-07-31",
+        "lang": "en",
+        "titleZh": "American Regent 动物健康部全国召回两批 Adequan® Canine 与两批 Adequan® I.M.，因产品检出可见玻璃纤维",
+        "zhSummary": "因产品中发现可见玻璃纤维材料，American Regent 全国召回部分批次的犬用及注射用 Adequan 关节保健药。"
+      },
+      {
+        "title": "First oral medicine targeting interleukin-23 receptor recommended for plaque psoriasis",
+        "summary": "",
+        "url": "https://www.ema.europa.eu/en/news/first-oral-medicine-targeting-interleukin-23-receptor-recommended-plaque-psoriasis",
+        "source": "EMA",
+        "date": "2026-07-24",
+        "lang": "en",
+        "titleZh": "EMA 推荐首款靶向白细胞介素-23 受体的口服药用于斑块状银屑病",
+        "zhSummary": "人用药品委员会（CHMP）推荐首款靶向 IL-23 受体的口服药物治疗中重度斑块状银屑病。"
+      },
+      {
+        "title": "New treatment option for neovascular age-related macular degeneration",
+        "summary": "",
+        "url": "https://www.ema.europa.eu/en/news/new-treatment-option-neovascular-age-related-macular-degeneration",
+        "source": "EMA",
+        "date": "2026-07-24",
+        "lang": "en",
+        "titleZh": "新生血管性年龄相关性黄斑变性迎来新治疗选择",
+        "zhSummary": "EMA 推荐通过眼内植入装置持续给药的 Susvimo，减少频繁的玻璃体内注射需求。"
+      },
+      {
+        "title": "Meeting highlights from the Committee for Medicinal Products for Human Use (CHMP) 20-23 July 2026",
+        "summary": "",
+        "url": "https://www.ema.europa.eu/en/news/meeting-highlights-committee-medicinal-products-human-use-chmp-20-23-july-2026",
+        "source": "EMA",
+        "date": "2026-07-24",
+        "lang": "en",
+        "titleZh": "人用药品委员会（CHMP）2026年7月20–23日会议要点",
+        "zhSummary": "CHMP 会议推荐 12 款新药获批、8 款药品拓展适应症。"
+      },
+      {
+        "title": "EMA and EISMEA boost cooperation to accelerate health innovations",
+        "summary": "",
+        "url": "https://www.ema.europa.eu/en/news/ema-eismea-boost-cooperation-accelerate-health-innovations",
+        "source": "EMA",
+        "date": "2026-07-15",
+        "lang": "en",
+        "titleZh": "EMA 与 EISMEA 加强合作以加速健康创新",
+        "zhSummary": "双方将加强协作，鼓励创新药物与健康解决方案的开发。"
+      },
+      {
+        "title": "Executive Director Emer Cooke's speech at the European Parliament's Committee on Public Health",
+        "summary": "",
+        "url": "https://www.ema.europa.eu/en/news/executive-director-emer-cookes-speech-european-parliaments-committee-public-health",
+        "source": "EMA",
+        "date": "2026-07-15",
+        "lang": "en",
+        "titleZh": "EMA 执行董事 Emer Cooke 在欧洲议会公共卫生委员会发言",
+        "zhSummary": "Emer Cooke 在 SANT 委员会年度观点交流中发表讲话。"
+      },
+      {
+        "title": "Meeting highlights from the Pharmacovigilance Risk Assessment Committee (PRAC) 6-9 July 2026",
+        "summary": "",
+        "url": "https://www.ema.europa.eu/en/news/meeting-highlights-pharmacovigilance-risk-assessment-committee-prac-6-9-july-2026",
+        "source": "EMA",
+        "date": "2026-07-10",
+        "lang": "en",
+        "titleZh": "药物警戒风险评估委员会（PRAC）2026年7月6–9日会议要点",
+        "zhSummary": "PRAC 就含去氧孕烯/依托孕烯避孕药及斑秃药 Litfulo 更新安全性信息。"
       }
     ]
   }
