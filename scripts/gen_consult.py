@@ -281,8 +281,8 @@ def main():
                 for it in cn.get(k, []):
                     if it.get("url") and it["url"] not in seen:
                         existing[k].append(it)
-                    seen.add(it["url"])
-                    added += 1
+                        seen.add(it["url"])
+                        added += 1
             print(f"[ok] 中文源新增 {added} 条")
             fetch_succeeded = True
         except Exception as e:
