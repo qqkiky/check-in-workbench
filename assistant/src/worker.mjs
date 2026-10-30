@@ -156,7 +156,7 @@ async function scheduleReminders(env) {
       s.lastDigest=day;
     }
     if (clock >= s.settings.quietStart || clock < s.settings.quietEnd) return;
-    for (const task of pending.filter(t=>t.date===day)) {
+    for (const task of pending.filter(t=>t.date===day && t.reminderEnabled!==false)) {
       const due = Date.parse(`${task.date}T${task.time}:00+08:00`);
       const lead = due-now;
       const next = task.lastReminderAt || 0;

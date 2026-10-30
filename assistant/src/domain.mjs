@@ -15,7 +15,9 @@ export function safeTask(input) {
   }
   return { id: input.id, title: input.title.trim(), date: input.date, time: input.time,
     status: input.status, duration: Math.max(1, Math.min(1440, Number(input.duration) || 30)),
-    completedAt: input.status === 'completed' ? Number(input.completedAt) || Date.now() : null };
+    completedAt: input.status === 'completed' ? Number(input.completedAt) || Date.now() : null,
+    reminderEnabled: input.reminderEnabled !== false,
+    reminderLead: Math.max(0,Math.min(1440,Number(input.reminderLead)||0)) };
 }
 export function resolveTask(tasks, query) {
   if (!query) return { error: '请说出任务名称，例如“写报告完成了”。' };

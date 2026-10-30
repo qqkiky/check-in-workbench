@@ -13,6 +13,7 @@ export interface SharedSchedule {
   id: string; title: string; date: string; time: string; duration: number
   status: 'pending' | 'completed' | 'cancelled'; completedAt: number | null
   version: number; updatedAt: number
+  reminderEnabled: boolean; reminderLead: number
 }
 interface TaskMeta { version: number; fingerprint: string }
 
@@ -40,7 +41,7 @@ export function schedulePayload(task: Task, records: CheckInRecord[]) {
   // Deliberately omit notes, descriptions, categories, record notes and financial data.
   return { id: task.id, title: task.title, date: task.scheduledDate, time: task.scheduledTime,
     duration: task.duration || 30, status: task.archivedAt ? 'cancelled' : record ? 'completed' : 'pending',
-    completedAt: record?.completedAt || null }
+    completedAt: record?.completedAt || null, reminderEnabled: !!task.reminderEnabled, reminderLead:task.reminderLead ?? 0 }
 }
 function fingerprint(value: unknown) { return JSON.stringify(value) }
 
@@ -94,7 +95,7 @@ export async function syncAssistant() {
       if (current && base && fingerprint(schedulePayload(current,latest.records)) !== fingerprint(base)) continue
       const task: Task = { ...current, id:item.id, title:item.title, scheduledDate:item.date,
         scheduledTime:item.time, duration:item.duration, recurrence:'none', categoryId:current?.categoryId || 'work',
-        reminderEnabled:current?.reminderEnabled ?? true, reminderLead:current?.reminderLead ?? 0,
+        reminderEnabled:item.reminderEnabled, reminderLead:item.reminderLead,
         createdAt:current?.createdAt || item.updatedAt, updatedAt:item.updatedAt,
         archivedAt:item.status === 'cancelled' ? item.updatedAt : undefined }
       if(index>=0) tasks[index]=task;else tasks.unshift(task)

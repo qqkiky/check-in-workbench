@@ -40,6 +40,9 @@ public class AssistantCalendarWorker extends Worker {
                 int count;while((count=input.read(buffer))!=-1){if(output.size()+count>1000000)return Result.failure();output.write(buffer,0,count);}
             }
             JSONArray tasks=new JSONObject(output.toString("UTF-8")).getJSONArray("tasks");
+            JSONArray localTasks=new JSONArray(values.optString("wb.tasks.v1","[]"));
+            JSONArray records=new JSONArray(values.optString("wb.records.v1","[]"));
+            JSONObject versions=new JSONObject(values.optString("wb.assistant.versions.v1","{}"));
             SimpleDateFormat format=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.ROOT);
             format.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));format.setLenient(false);
             synchronized(CalendarRepository.class){
@@ -47,6 +50,24 @@ public class AssistantCalendarWorker extends Worker {
                 for(int i=0;i<Math.min(tasks.length(),2000);i++){
                     JSONObject task=tasks.getJSONObject(i);
                     String id=task.getString("id"),date=task.getString("date"),time=task.getString("time"),status=task.getString("status");
+                    // Foreground changes not yet pushed take precedence over an older cloud snapshot.
+                    JSONObject metadata=versions.optJSONObject(id);
+                    if(metadata!=null){
+                        JSONObject local=null;
+                        for(int j=0;j<localTasks.length();j++)if(id.equals(localTasks.getJSONObject(j).optString("id")))local=localTasks.getJSONObject(j);
+                        if(local==null)continue;
+                        JSONObject last=new JSONObject(metadata.getString("fingerprint"));
+                        boolean done=false;
+                        for(int j=0;j<records.length();j++){
+                            JSONObject record=records.getJSONObject(j);
+                            if(id.equals(record.optString("taskId"))&&local.optString("scheduledDate").equals(record.optString("date")))done=true;
+                        }
+                        String localStatus=local.optLong("archivedAt",0)>0?"cancelled":done?"completed":"pending";
+                        if(!local.optString("title").equals(last.optString("title"))
+                            ||!local.optString("scheduledDate").equals(last.optString("date"))
+                            ||!local.optString("scheduledTime").equals(last.optString("time"))
+                            ||!localStatus.equals(last.optString("status")))continue;
+                    }
                     if(!id.matches("[A-Za-z0-9_-]{1,100}")||!date.matches("\\d{4}-\\d{2}-\\d{2}")||!time.matches("([01]\\d|2[0-3]):[0-5]\\d"))continue;
                     if(!status.equals("pending")&&!status.equals("completed")&&!status.equals("cancelled"))continue;
                     String currentKey=id+"@"+date;
@@ -57,7 +78,7 @@ public class AssistantCalendarWorker extends Worker {
                     long start=format.parse(date+" "+time).getTime();
                     int duration=Math.max(1,Math.min(1440,task.optInt("duration",30)));
                     String title=task.getString("title");if(title.length()>200)continue;
-                    calendar.upsertEvent(currentKey,title,start,start+duration*60000L,0,"来自工作台日程助手",status.equals("completed"),true);
+                    calendar.upsertEvent(currentKey,title,start,start+duration*60000L,task.optInt("reminderLead",0),"来自工作台日程助手",status.equals("completed"),task.optBoolean("reminderEnabled",true));
                 }
             }
             return Result.success();
