@@ -1,6 +1,8 @@
 import type { Task, CheckInRecord, Category, AppSettings, Note, TimelineEntry, Transaction, AcctCategory, Account, Transfer } from '@/types'
 import { DEFAULT_CATEGORIES, DEFAULT_ACCT_CATEGORIES, DEFAULT_ACCT_ACCOUNTS } from '@/types'
 import { APP_VERSION } from '@/version'
+import { canExportKey } from './privacy'
+import { appStorage } from './appStorage'
 
 const KEYS = {
   tasks: 'wb.tasks.v1',
@@ -18,7 +20,7 @@ const KEYS = {
 
 function read<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = appStorage.getItem(key)
     if (!raw) return fallback
     return JSON.parse(raw) as T
   } catch {
@@ -28,7 +30,7 @@ function read<T>(key: string, fallback: T): T {
 
 function write<T>(key: string, value: T) {
   try {
-    localStorage.setItem(key, JSON.stringify(value))
+    appStorage.setItem(key, JSON.stringify(value))
   } catch (e) {
     console.warn('Storage write failed', e)
   }
@@ -84,10 +86,10 @@ export const storage = {
     const settings: AppSettings = { ...defaults, ...parsed }
     // 一次性迁移：旧版默认 notificationEnabled=false，升级后默认开启提醒；
     // 已显式设置过的用户不受影响（迁移标记只写一次）。
-    if (!localStorage.getItem('wb.settings.reminderMigrated')) {
+    if (!appStorage.getItem('wb.settings.reminderMigrated')) {
       settings.notificationEnabled = true
       write(KEYS.settings, settings)
-      localStorage.setItem('wb.settings.reminderMigrated', '1')
+      appStorage.setItem('wb.settings.reminderMigrated', '1')
     }
     return settings
   },
@@ -95,10 +97,10 @@ export const storage = {
     write(KEYS.settings, settings)
   },
   isInitialized(): boolean {
-    return localStorage.getItem(KEYS.initialized) === '1'
+    return appStorage.getItem(KEYS.initialized) === '1'
   },
   markInitialized() {
-    localStorage.setItem(KEYS.initialized, '1')
+    appStorage.setItem(KEYS.initialized, '1')
   },
   getNotes(): Note[] {
     return read<Note[]>(KEYS.notes, [])
@@ -128,7 +130,7 @@ export const storage = {
   },
   // 分类：首次（key 不存在）写入默认预设，保证有初始数据
   getAcctCategories(): AcctCategory[] {
-    if (localStorage.getItem(KEYS.acctCategories) === null) {
+    if (appStorage.getItem(KEYS.acctCategories) === null) {
       write(KEYS.acctCategories, DEFAULT_ACCT_CATEGORIES)
       return DEFAULT_ACCT_CATEGORIES
     }
@@ -140,7 +142,7 @@ export const storage = {
   },
   // 账户：同分类，首次写入默认预设
   getAcctAccounts(): Account[] {
-    if (localStorage.getItem(KEYS.acctAccounts) === null) {
+    if (appStorage.getItem(KEYS.acctAccounts) === null) {
       write(KEYS.acctAccounts, DEFAULT_ACCT_ACCOUNTS)
       return DEFAULT_ACCT_ACCOUNTS
     }
@@ -159,14 +161,14 @@ export const storage = {
   },
 
   // ---------- 全量备份 / 恢复 ----------
-  // 导出所有以 wb. 为前缀的 localStorage 数据（含记账/笔记/时间线/转账等全部模块），
+  // 导出所有以 wb. 为前缀的 appStorage 数据（含记账/笔记/时间线/转账等全部模块），
   // 返回带元信息的 JSON 字符串。采用前缀扫描而非硬编码键，避免未来新增模块被遗漏。
   exportAllData(): string {
     const data: Record<string, string> = {}
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('wb.')) {
-        data[key] = localStorage.getItem(key) ?? ''
+    for (let i = 0; i < appStorage.length; i++) {
+      const key = appStorage.key(i)
+      if (key && canExportKey(key)) {
+        data[key] = appStorage.getItem(key) ?? ''
       }
     }
     const payload = {
@@ -191,7 +193,7 @@ export const storage = {
       throw new Error('备份文件格式不正确')
     }
     const data = parsed.data as Record<string, unknown>
-    // 裸短名 → store 实际读取的完整 localStorage 键
+    // 裸短名 → store 实际读取的完整 appStorage 键
     const SHORT_TO_FULL: Record<string, string> = {
       tasks: KEYS.tasks,
       records: KEYS.records,
@@ -220,9 +222,10 @@ export const storage = {
         key = `wb.${k}`
       }
       const raw = data[k]
+      if (!canExportKey(key)) return
       // 旧导出值可能是对象（未序列化），统一序列化为字符串再存
       const store = typeof raw === 'string' ? raw : JSON.stringify(raw)
-      localStorage.setItem(key, store)
+      appStorage.setItem(key, store)
       count++
     })
     return { ok: true, keys: count, appVersion: parsed.appVersion }

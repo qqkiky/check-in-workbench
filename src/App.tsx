@@ -16,6 +16,7 @@ import { initSyncManager } from './utils/syncManager'
 import { pullOnly } from './services/cloudSync'
 import { syncTasksToCalendar } from './capacitor/task-calendar'
 import { Icons } from './components/common/Icons'
+import { initAssistantSync } from './services/assistant'
 
 type Tab = 'home' | 'account' | 'timeline' | 'info' | 'more' | 'notes'
 
@@ -43,6 +44,7 @@ export default function App() {
 
   useEffect(() => {
     init()
+    initAssistantSync()
   }, [init])
 
   // 主题色变化（用户在「更多→外观」切换）实时套用
@@ -68,7 +70,8 @@ export default function App() {
   // 启动后把现有「开启提醒」的待办同步到系统日历（原生平台生效，Web 端 no-op）
   useEffect(() => {
     const t = setTimeout(() => {
-      void syncTasksToCalendar(useStore.getState().tasks)
+      const state = useStore.getState()
+      void syncTasksToCalendar(state.tasks, state.records).catch(() => {})
     }, 800)
     return () => clearTimeout(t)
   }, [])

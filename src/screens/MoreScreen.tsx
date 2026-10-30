@@ -11,9 +11,10 @@ import { CategoryIcon } from '@/utils/iconLibrary'
 import { CategoryFormModal } from '@/components/tasks/CategoryFormModal'
 import { onInstallable, isInstallable, installApp, isIOS, isStandalone, getInstallPlatform, isInAppBrowser, isMiuiBrowser } from '@/utils/pwa'
 import { requestNotificationPermission } from '@/utils/reminder'
-import { syncTasksToCalendar, isCalendarAvailable } from '@/capacitor/task-calendar'
+import { syncTasksToCalendar, isCalendarAvailable, enableCalendarSync } from '@/capacitor/task-calendar'
 import { APP_NAME } from '@/types'
 import { THEME_PRESETS } from '@/utils/theme'
+import { AssistantSettings } from '@/components/AssistantSettings'
 
 export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => void; onOpenList?: () => void }) {
   const { settings, updateSettings, reset, reload, restoreSnapshot, records, tasks, categories } = useStore()
@@ -223,6 +224,7 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
           </div>
         </div>
 
+        <AssistantSettings />
         {/* 数据同步（Supabase，本地优先） */}
         <button
           onClick={() => setShowSync(true)}
@@ -246,7 +248,7 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
           <p className="text-[11px] text-gray-400 leading-relaxed pl-7">
             {settings.cloudSyncEnabled
               ? `本地优先，多设备镜像同步 · 上次：${settings.lastSyncAt ? new Date(settings.lastSyncAt).toLocaleString('zh-CN') : '尚未同步'}`
-              : '本地数据离线可用，配置 Supabase 后可多设备同步（Android 与未来 iOS 通用）。'}
+              : '本地数据离线可用；云同步仅传输任务、打卡和分类，记账与笔记留在本机。'}
           </p>
         </button>
 
@@ -299,8 +301,11 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
                 showToast('请在手机 App 中打开，以同步到系统日历')
                 return
               }
-              void syncTasksToCalendar(tasks)
-              showToast('已同步到系统日历 📅')
+              try {
+                if (!await enableCalendarSync()) { showToast('未授予日历权限，尚未同步'); return }
+                const count = await syncTasksToCalendar(tasks, records)
+                showToast(`已同步 ${count} 项日程到系统日历 📅`)
+              } catch { showToast('日历同步失败，请检查权限后重试') }
             }}
             className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors"
           >
@@ -308,7 +313,7 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
             <span className="flex-1">
               <span className="block text-sm font-medium text-gray-900">同步到系统日历</span>
               <span className="block text-[11px] text-gray-400">
-                把开启「到点提醒」的待办写入手机日历，到点弹系统提醒
+                写入专属日历；完成后标记 ✅ 并取消提醒
               </span>
             </span>
             <Icons.ChevronRight size={14} className="text-gray-300" />

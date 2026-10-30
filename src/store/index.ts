@@ -166,7 +166,7 @@ export const useStore = create<StoreState>((set, get) => ({
     storage.setTasks(next)
     set({ tasks: next })
     // 同步到系统日历提醒（原生平台生效，Web 端 no-op）
-    void syncTaskToCalendar(newTask)
+    void syncTaskToCalendar(newTask, get().records)
   },
 
   updateTask(id, patch) {
@@ -178,8 +178,8 @@ export const useStore = create<StoreState>((set, get) => ({
     // 同步到系统日历：满足提醒条件则 upsert，否则移除以免残留旧提醒
     const updated = next.find((t) => t.id === id)
     if (updated) {
-      if (updated.reminderEnabled && updated.scheduledTime && updated.scheduledDate) {
-        void syncTaskToCalendar(updated)
+      if (!updated.archivedAt && updated.scheduledTime) {
+        void syncTaskToCalendar(updated, get().records)
       } else {
         void removeTaskFromCalendar(id)
       }
@@ -213,12 +213,17 @@ export const useStore = create<StoreState>((set, get) => ({
     const next = [newRec, ...get().records]
     storage.setRecords(next)
     set({ records: next })
+    const task = get().tasks.find(task => task.id === record.taskId)
+    if (task) void syncTaskToCalendar(task, next)
   },
 
   deleteRecord(id) {
+    const removed = get().records.find(record => record.id === id)
     const next = get().records.filter((r) => r.id !== id)
     storage.setRecords(next)
     set({ records: next })
+    const task = get().tasks.find(task => task.id === removed?.taskId)
+    if (task) void syncTaskToCalendar(task, next)
   },
 
   addCategory(cat) {

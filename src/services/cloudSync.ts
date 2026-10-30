@@ -2,7 +2,7 @@
  * 云同步引擎（Supabase，本地优先）
  * ----------------------------------------------------------------------------
  * 设计原则：
- * 1. 本地 localStorage 永远是真相源。所有写操作先落本地，再异步 push 到云端。
+ * 1. 本地 appStorage 永远是真相源。所有写操作先落本地，再异步 push 到云端。
  *    断网/飞行模式照常用，联网后增量同步，绝不阻断本地体验。
  * 2. 云端是「尽力同步的副本」。Supabase 只做多设备镜像，不参与单端读写。
  * 3. 零 PII：Supabase Auth 匿名登录，不收集邮箱/手机号；RLS 保证仅本人可见。
@@ -16,6 +16,8 @@
  */
 
 import type { AppSettings } from '@/types'
+import { canSyncKey, scheduleOnlyValue, preservePrivateFields } from './privacy'
+import { appStorage } from './appStorage'
 
 const AUTH_KEY = 'wb.sync.auth.v1' // 注意：此键非 wb. 前缀，不参与同步，避免回环
 
@@ -74,7 +76,7 @@ function parseErr(txt: string): string {
 
 function readAuth(): AuthState | null {
   try {
-    const raw = localStorage.getItem(AUTH_KEY)
+    const raw = appStorage.getItem(AUTH_KEY)
     if (!raw) return null
     return JSON.parse(raw) as AuthState
   } catch {
@@ -83,8 +85,8 @@ function readAuth(): AuthState | null {
 }
 
 function writeAuth(a: AuthState | null) {
-  if (a) localStorage.setItem(AUTH_KEY, JSON.stringify(a))
-  else localStorage.removeItem(AUTH_KEY)
+  if (a) appStorage.setItem(AUTH_KEY, JSON.stringify(a))
+  else appStorage.removeItem(AUTH_KEY)
 }
 
 // ---- 匿名登录 / 刷新 ----
@@ -150,11 +152,11 @@ export async function ensureAuth(url: string, anonKey: string): Promise<AuthStat
 // ---- 本地键收集 ----
 function collectLocalKeys(): { key: string; value: string }[] {
   const out: { key: string; value: string }[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i)
+  for (let i = 0; i < appStorage.length; i++) {
+    const k = appStorage.key(i)
     // 同步所有 wb.* 键；排除同步自身的 auth 键（非 wb. 前缀，天然不在此列）
-    if (k && k.startsWith('wb.')) {
-      out.push({ key: k, value: localStorage.getItem(k) ?? '' })
+    if (k && canSyncKey(k)) {
+      out.push({ key: k, value: scheduleOnlyValue(k, appStorage.getItem(k) ?? '[]') })
     }
   }
   return out
@@ -221,13 +223,14 @@ function applyPull(rows: RemoteRow[]): { applied: number; deleted: number } {
   let applied = 0
   let deleted = 0
   for (const r of rows) {
+    if (!canSyncKey(r.key)) continue
     if (r.deleted_at) {
-      if (localStorage.getItem(r.key) !== null) {
-        localStorage.removeItem(r.key)
+      if (appStorage.getItem(r.key) !== null) {
+        appStorage.removeItem(r.key)
         deleted++
       }
     } else {
-      localStorage.setItem(r.key, r.value)
+      appStorage.setItem(r.key, preservePrivateFields(r.key, r.value, appStorage.getItem(r.key)))
       applied++
     }
   }

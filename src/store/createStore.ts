@@ -46,13 +46,12 @@ export function create<T>(initializer: (set: (partial: StateUpdater<T>) => void,
   }
 
   // 暴露 getState / subscribe，供非 React 场景使用（云同步管理器订阅变更防抖 push）
-  ;(useStore as any).getState = getState
-  ;(useStore as any).subscribe = (cb: Listener) => {
+  const subscribe = (cb: Listener) => {
     listeners.add(cb)
     return () => {
       listeners.delete(cb)
     }
   }
 
-  return useStore
+  return Object.assign(useStore, { getState, subscribe })
 }

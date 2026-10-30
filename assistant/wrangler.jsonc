@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "checkin-schedule-assistant",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-29",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [{
+    "binding": "DB", "database_name": "checkin-schedules",
+    "database_id": "REPLACE_WITH_YOUR_FREE_D1_DATABASE_ID"
+  }],
+  "ai": { "binding": "AI" },
+  "vars": {
+    "ALLOWED_ORIGINS": "https://localhost,https://qqkiky.github.io",
+    "AI_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
+    "AI_CALLS_PER_DAY": "30"
+  }
+}
