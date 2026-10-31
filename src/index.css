@@ -21,6 +21,7 @@
     --danger-color: #FF3B30;
     --success-color: #34C759;
     --warning-color: #FF9500;
+    --app-safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
   }
 
   * {
@@ -32,6 +33,10 @@
     height: 100%;
     overflow: hidden;
     overscroll-behavior-y: none;
+  }
+
+  #root {
+    padding-top: var(--app-safe-top);
   }
 
   body {
@@ -73,6 +78,14 @@
 }
 
 @layer components {
+  .modal-backdrop {
+    padding-top: var(--app-safe-top);
+  }
+
+  .modal-backdrop > .modal-content {
+    max-height: min(90vh, calc(100dvh - var(--app-safe-top)));
+  }
+
   .glass-card {
     @apply bg-white rounded-2xl shadow-card;
   }
