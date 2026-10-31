@@ -13,6 +13,12 @@ export async function pairDevice(url:string,code:string){
   await saveAssistantConfig({url,token:data.token,enabled:!!readAssistantConfig()?.enabled})
   return data.token as string
 }
+export async function newDeviceCode():Promise<string>{
+  const config=readAssistantConfig();if(!config?.token)throw new Error('请先连接此设备')
+  const response=await fetch(endpoint(config.url)+'/v1/device-code',{method:'POST',headers:{Authorization:`Bearer ${config.token}`,'Content-Type':'application/json'},body:'{}',redirect:'error',signal:AbortSignal.timeout(20000)})
+  if(!response.ok)throw new Error('生成连接码失败，请重试')
+  return (await response.json()).code
+}
 export async function saveDataConnection(url:string,token:string,key:string){
   if(!/^[a-fA-F0-9]{64}$/.test(key.trim()))throw new Error('请生成密钥或填写原设备的64位数据密钥')
   await saveAssistantConfig({url,token,enabled:!!readAssistantConfig()?.enabled})

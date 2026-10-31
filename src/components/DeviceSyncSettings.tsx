@@ -2,7 +2,7 @@ import {useState} from 'react'
 import {Modal} from './common/Modal'
 import {showToast} from './common/Toast'
 import {readAssistantConfig} from '@/services/assistant'
-import {readDataKey,generateDataKey,saveDataConnection,prepareDataSync,commitDataSync,pairDevice,type SyncPlan} from '@/services/deviceSync'
+import {readDataKey,generateDataKey,saveDataConnection,prepareDataSync,commitDataSync,pairDevice,newDeviceCode,type SyncPlan} from '@/services/deviceSync'
 import type {Choices} from '@/services/vault'
 
 export function DeviceSyncSettings(){
@@ -10,6 +10,7 @@ export function DeviceSyncSettings(){
   const [url,setUrl]=useState(()=>readAssistantConfig()?.url||'https://checkin-schedule-assistant.kiki-workbench-519bc4.workers.dev')
   const [token,setToken]=useState(()=>readAssistantConfig()?.token||'')
   const [pairCode,setPairCode]=useState(''),[showKey,setShowKey]=useState(false)
+  const [shareCode,setShareCode]=useState('')
   const [key,setKey]=useState(readDataKey),[plan,setPlan]=useState<SyncPlan|null>(null),[choices,setChoices]=useState<Choices>({})
   async function sync(){
     setBusy(true)
@@ -37,7 +38,11 @@ export function DeviceSyncSettings(){
       <div className="space-y-4 text-sm">
         <p className="text-xs text-gray-600">同步任务、打卡、记账、账户、转账、笔记、分类和外观偏好。此通道只上传设备端加密后的密文，数据密钥不上传。微信助手的日程处理单独启用。</p>
         <label className="block">服务地址<input disabled={busy} type="url" value={url} onChange={e=>{setUrl(e.target.value);setToken('');setPlan(null)}} className="mt-1 w-full border rounded-xl p-3" autoCapitalize="none" /></label>
-        {token?<p className="text-green-700">服务已连接</p>:<div className="space-y-2">
+        {token?<div className="space-y-2">
+          <p className="text-green-700">服务已连接</p>
+          <button disabled={busy} className="text-primary disabled:opacity-40" onClick={async()=>{setBusy(true);try{setShareCode(await newDeviceCode())}catch(error){showToast(error instanceof Error?error.message:'生成失败')}finally{setBusy(false)}}}>连接另一台设备</button>
+          {shareCode&&<p className="text-xs text-gray-600">新设备连接码：<strong className="text-lg tracking-widest">{shareCode}</strong>。10分钟内使用一次；新设备还需填写你保存的数据密钥。</p>}
+        </div>:<div className="space-y-2">
           <label className="block">一次性设备连接码<input disabled={busy} inputMode="numeric" maxLength={8} value={pairCode} onChange={e=>setPairCode(e.target.value.replace(/\D/g,''))} className="mt-1 w-full border rounded-xl p-3" placeholder="8位连接码" /></label>
           <button disabled={busy||pairCode.length!==8} className="text-primary disabled:opacity-40" onClick={async()=>{setBusy(true);try{setToken(await pairDevice(url,pairCode));setPairCode('');showToast('设备已连接')}catch(error){showToast(error instanceof Error?error.message:'连接失败')}finally{setBusy(false)}}}>连接此设备</button>
         </div>}

@@ -226,7 +226,7 @@ export default {
           });
           return accepted?respond({token:env.DEVICE_TOKEN}):respond({error:'pairing_code_rejected'},403);
         }
-        if(admin && url.pathname==='/admin/device-pair') {
+        if((admin && url.pathname==='/admin/device-pair') || url.pathname==='/v1/device-code') {
           const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%100000000).padStart(8,'0');
           const expiresAt=Date.now()+600000;
           const hash=b64(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(code))));
