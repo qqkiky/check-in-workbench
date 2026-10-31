@@ -7,6 +7,8 @@ export function expireBookkeeping(state, now = Date.now()) {
   if (state.bookkeepingDraft && now - state.bookkeepingDraft.createdAt >= RETENTION_MS) delete state.bookkeepingDraft;
 }
 export function bookkeepingInput(text, draft) {
+  if (!draft && !/记账|记一笔|收入|支出|花了|付了|支付|元|块钱/.test(text)
+    && (/提醒我|记得|待办|日程|安排/.test(text) || /(今天|明天|后天|下周|周[一二三四五六日天])/.test(text) && /点|[:：]\d{2}|上午|下午|晚上|中午/.test(text))) return null;
   text = text.replace(/(?<![\d.])[零〇一二两三四五六七八九十百千万]+(?:点[零〇一二两三四五六七八九]+)?(?=元|块)/g, value => {
     const digits = '零一二三四五六七八九';
     const [whole, fraction] = value.replace(/〇/g,'零').replace(/两/g,'二').split('点');

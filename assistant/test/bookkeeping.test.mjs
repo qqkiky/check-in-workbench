@@ -29,6 +29,8 @@ test('amount and direction can be supplied through follow-up messages',()=>{
   assert.equal(state.bookkeeping[0].amountCents,3000);
 });
 test('a schedule does not overwrite a pending bill and queries stay on the phone',()=>{
+  assert.equal(bookkeepingInput('明天12点吃午饭'),null);
+  assert.equal(bookkeepingInput('提醒我明天下午三点买午饭'),null);
   assert.equal(bookkeepingInput('明天下午3点写报告',{amountCents:3000}),null);
   assert.match(applyBookkeeping({},bookkeepingInput('本月花了多少'),'m1'),/APK/);
 });
