@@ -1,4 +1,5 @@
 import { safeTask, cstDay, applyActions, ruleActions } from './domain.mjs';
+import { bookkeepingInput, applyBookkeeping, expireBookkeeping, receiveBookkeeping } from './bookkeeping.mjs';
 
 const BASE = 'https://ilinkai.weixin.qq.com';
 const encoder = new TextEncoder();
@@ -70,7 +71,7 @@ async function wx(state,path,body,authenticated = true) {
   return result;
 }
 function enqueue(state,text,key) {
-  if (!state.outbox.some(item => item.key === key)) state.outbox.push({ key,text,clientId:crypto.randomUUID(),attempts:0 });
+  if (!state.outbox.some(item => item.key === key)) state.outbox.push({ key,text,clientId:crypto.randomUUID(),attempts:0,createdAt:Date.now() });
   state.outbox = state.outbox.slice(-50);
 }
 async function parseMessage(env,state,text) {
@@ -113,16 +114,17 @@ async function poll(env) {
       if (!id || state.seen.includes(id)) continue;
       if(handled>=3){fullyHandled=false;break;}
       const text = (message.item_list || []).map(item => item.text_item?.text || item.voice_item?.text || '').join('\n').trim().slice(0,2000);
-      const actions = text ? await parseMessage(env,state,text) : [{type:'clarify',question:'第一版支持文字及微信已转写的语音，请发任务名称和时间。'}];
+      const finance = text ? bookkeepingInput(text,state.bookkeepingDraft) : null;
+      const actions = finance ? null : text ? await parseMessage(env,state,text) : [{type:'clarify',question:'这条语音没有收到转写文字，请补发文字；日程请说明任务和时间，记账请说明账户、收入或支出及金额。'}];
       await mutate(env,s => {
         if (s.seen.includes(id)) return;
-        const result = applyActions(s.tasks,actions,Date.now(),id);
+        const result = finance ? { tasks: s.tasks, reply: applyBookkeeping(s,finance,id) } : applyActions(s.tasks,actions,Date.now(),id);
         s.tasks = result.tasks;
         s.outbox=s.outbox.filter(out=>!out.key.startsWith('reminder-') || s.tasks.some(t=>t.status==='pending' && out.key.startsWith(`reminder-${t.id}-`)));
         s.seen = [...s.seen,id].slice(-1000);
         if (message.context_token) s.contextToken = message.context_token;
         s.lastInboundAt = Date.now(); s.deliveryError = false;
-        enqueue(s,result.reply,`reply-${id}`);
+        enqueue(s,result.reply,`${finance ? 'finance-' : ''}reply-${id}`);
       });
       state = (await load(env)).state;
       handled++;
@@ -149,6 +151,7 @@ async function poll(env) {
 async function scheduleReminders(env) {
   const now = Date.now(), day = cstDay(now), clock = new Date(now+8*3600000).toISOString().slice(11,16);
   await mutate(env,s => {
+    expireBookkeeping(s,now);
     const pending=s.tasks.filter(task=>task.status==='pending');
     if (clock >= s.settings.morningTime && clock < '12:00' && s.lastDigest !== day) {
       const today=pending.filter(task=>task.date===day).sort((a,b)=>a.time.localeCompare(b.time));
@@ -183,6 +186,10 @@ export default {
     const admin=await secretEqual(token,env.ADMIN_TOKEN);
     if (!admin && (url.pathname.startsWith('/admin/') || !await secretEqual(token,env.DEVICE_TOKEN))) return respond({error:'unauthorized'},401);
     try {
+      if (request.method==='GET' && url.pathname==='/v1/bookkeeping') {
+        const items=await mutate(env,s=>{expireBookkeeping(s);return s.bookkeeping;});
+        return respond({items});
+      }
       if (request.method==='GET' && url.pathname==='/v1/schedules') {
         const {state}=await load(env);
         return respond({tasks:state.tasks.map(t=>({...safeTask(t),version:t.version,updatedAt:t.updatedAt})),deliveryError:!!state.deliveryError,connected:!!state.botToken});
@@ -191,6 +198,15 @@ export default {
         if (Number(request.headers.get('Content-Length') || 0)>32768) return respond({error:'too_large'},413);
         const raw=await request.text(); if(encoder.encode(raw).length>32768)return respond({error:'too_large'},413);
         const body=JSON.parse(raw || '{}');
+        if (url.pathname==='/v1/bookkeeping/receipts') {
+          if(!Array.isArray(body.receipts)||body.receipts.length>100||body.receipts.some(r=>!r||typeof r.id!=='string'||!Number.isSafeInteger(r.version)||!['applied','account_required'].includes(r.status)))return respond({error:'invalid_receipts'},400);
+          await mutate(env,s=>{
+            expireBookkeeping(s);
+            const replies=receiveBookkeeping(s,body.receipts);
+            for(const [index,reply] of replies.entries())enqueue(s,reply,`bookkeeping-receipt-${crypto.randomUUID()}-${index}`);
+          });
+          return respond({ok:true});
+        }
         if (url.pathname==='/v1/schedules') {
           if(!Array.isArray(body.tasks)||body.tasks.length>100)return respond({error:'invalid_batch'},400);
           const result=await mutate(env,s=>{

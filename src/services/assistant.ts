@@ -4,9 +4,11 @@ import { storage } from './storage'
 import { useStore } from '@/store'
 import type { Task, CheckInRecord } from '@/types'
 import { syncTasksToCalendar } from '@/capacitor/task-calendar'
+import { inboxTransaction, type BookkeepingItem } from './bookkeepingInbox'
 
 const CONFIG_KEY = 'wb.assistant.connection.v1'
 const META_KEY = 'wb.assistant.versions.v1'
+const BOOKKEEPING_RECEIPTS = 'wb.assistant.bookkeeping.receipts.v1'
 const NativeAssistant = registerPlugin<{ configure(options: { enabled: boolean }): Promise<void> }>('AssistantBackground')
 export interface AssistantConfig { url: string; token: string; enabled: boolean }
 export interface SharedSchedule {
@@ -56,6 +58,31 @@ async function request(config: AssistantConfig, path: string, data?: unknown) {
   return response.json()
 }
 
+export async function syncBookkeeping(config: AssistantConfig) {
+  const result = await request(config, '/v1/bookkeeping')
+  if (!Array.isArray(result.items) || result.items.length > 100) throw new Error('待同步账目格式不正确')
+  const local = useStore.getState()
+  const transactions = [...local.transactions]
+  const imported: string[] = JSON.parse(appStorage.getItem(BOOKKEEPING_RECEIPTS) || '[]')
+  const receipts: { id: string; version: number; status: 'applied' | 'account_required' }[] = []
+  for (const item of result.items as BookkeepingItem[]) {
+    if (imported.includes(item.id) || transactions.some(transaction => transaction.id === item.id)) {
+      receipts.push({id:item.id,version:item.version,status:'applied'}); continue
+    }
+    const transaction = inboxTransaction(item,local.accounts,local.acctCategories)
+    if (!transaction) { receipts.push({id:item.id,version:item.version,status:'account_required'}); continue }
+    transactions.unshift(transaction); imported.push(item.id)
+    receipts.push({id:item.id,version:item.version,status:'applied'})
+  }
+  if (!receipts.length) return
+  // Acknowledge only after the encrypted phone write succeeds, so network retries cannot lose a bill.
+  appStorage.setItem('wb.acct.transactions.v1',JSON.stringify(transactions))
+  appStorage.setItem(BOOKKEEPING_RECEIPTS,JSON.stringify(imported.slice(-2000)))
+  await flushPrivateStorage()
+  local.reload()
+  await request(config,'/v1/bookkeeping/receipts',{receipts})
+}
+
 let busy = false
 export async function syncAssistant() {
   const config = readAssistantConfig()
@@ -89,6 +116,7 @@ export async function syncAssistant() {
       if (!item?.id || !item.title || !/^\d{4}-\d{2}-\d{2}$/.test(item.date) || !/^\d{2}:\d{2}$/.test(item.time)) continue
       const index = tasks.findIndex(task => task.id === item.id)
       const current = index >= 0 ? tasks[index] : undefined
+      if(current && !schedulePayload(current,latest.records)){delete meta[item.id];continue}
       // Do not overwrite edits made on this device while the network was in flight.
       const base = payloads.find(task => task!.id === item.id)
       if(base && !current)continue
@@ -112,6 +140,7 @@ export async function syncAssistant() {
     appStorage.setItem(META_KEY,JSON.stringify(meta))
     await flushPrivateStorage()
     latest.reload()
+    await syncBookkeeping(config)
     await syncTasksToCalendar(tasks,records)
     return { count:remote.tasks.length as number, deliveryError:!!remote.deliveryError, connected:!!remote.connected }
   } finally { busy=false }

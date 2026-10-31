@@ -88,7 +88,7 @@ public class TaskCalendarPlugin extends Plugin {
                 res.put("eventId", eventId);
                 call.resolve(res);
             } catch (Exception e) {
-                Log.e(TAG, "syncTask failed", e);
+                Log.e(TAG, "syncTask failed");
                 call.reject("写入日历失败：" + e.getMessage());
             }
         });
@@ -134,7 +134,7 @@ public class TaskCalendarPlugin extends Plugin {
                 res.put("results", results);
                 call.resolve(res);
             } catch (Exception e) {
-                Log.e(TAG, "syncAll failed", e);
+                Log.e(TAG, "syncAll failed");
                 call.reject("批量写入日历失败：" + e.getMessage());
             }
         });
@@ -163,7 +163,7 @@ public class TaskCalendarPlugin extends Plugin {
                 res.put("removed", removed);
                 call.resolve(res);
             } catch (Exception e) {
-                Log.e(TAG, "removeTask failed", e);
+                Log.e(TAG, "removeTask failed");
                 call.reject("删除日历事件失败：" + e.getMessage());
             }
         });
