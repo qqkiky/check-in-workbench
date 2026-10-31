@@ -60,14 +60,19 @@ async function wx(state,path,body,authenticated = true) {
     headers['X-WECHAT-UIN'] = btoa(String(crypto.getRandomValues(new Uint32Array(1))[0]));
   }
   if (authenticated) headers.Authorization = `Bearer ${state.botToken}`;
-  const response = await fetch(`${trustedHost(state.baseUrl || BASE)}${path}`, {
+  let response;
+  try { response = await fetch(`${trustedHost(state.baseUrl || BASE)}${path}`, {
     method: body === undefined ? 'GET' : 'POST', headers,
     body: body === undefined ? undefined : JSON.stringify(authenticated ? { ...body, base_info: { channel_version:'2.4.10',bot_agent:'Checkin/1.0' } } : body),
-    signal: AbortSignal.timeout(40000), redirect:'error',
-  });
+    signal: AbortSignal.timeout(40000), redirect:'manual',
+  }); } catch { throw new Error('weixin_network_error'); }
   if (!response.ok) throw new Error(`weixin_http_${response.status}`);
-  const result = await response.json();
-  if ((result.ret !== undefined && result.ret !== 0) || (result.errcode !== undefined && result.errcode !== 0)) throw new Error('weixin_request_rejected');
+  let result;
+  try { result = await response.json(); } catch { throw new Error('weixin_invalid_json'); }
+  if ((result.ret !== undefined && result.ret !== 0) || (result.errcode !== undefined && result.errcode !== 0)) {
+    const code = Number(result.errcode || result.ret);
+    throw new Error(`weixin_request_rejected_${Number.isSafeInteger(code) ? code : 'unknown'}`);
+  }
   return result;
 }
 function enqueue(state,text,key) {
@@ -244,7 +249,10 @@ export default {
         }
       }
       return respond({error:'not_found'},404);
-    } catch { return respond({error:'request_failed'},400); }
+    } catch (error) {
+      const reason = error instanceof Error && /^(weixin_http_\d+|weixin_request_rejected_(-?\d+|unknown)|weixin_network_error|weixin_invalid_json|untrusted_weixin_host|state_busy|storage_key_missing)$/.test(error.message) ? error.message : 'runtime_error';
+      return respond(admin ? {error:'request_failed',reason} : {error:'request_failed'},400);
+    }
   },
   async scheduled(_event, env, context) { context.waitUntil(poll(env)); },
 };
