@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import type { Task, CheckInRecord, Category, AppSettings } from '@/types'
 import { useStore } from '@/store'
 import { storage } from '@/services/storage'
@@ -15,8 +16,10 @@ import { syncTasksToCalendar, isCalendarAvailable, enableCalendarSync } from '@/
 import { APP_NAME } from '@/types'
 import { THEME_PRESETS } from '@/utils/theme'
 import { AssistantSettings } from '@/components/AssistantSettings'
+import { DeviceSyncSettings } from '@/components/DeviceSyncSettings'
 
 export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => void; onOpenList?: () => void }) {
+  const isNativeApp = Capacitor.isNativePlatform()
   const { settings, updateSettings, reset, reload, restoreSnapshot, records, tasks, categories } = useStore()
   const [showAbout, setShowAbout] = useState(false)
   const [showReset, setShowReset] = useState(false)
@@ -40,6 +43,7 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
   const isInStandalone = isStandalone()
 
   useEffect(() => {
+    if (isNativeApp) return
     setCanInstall(isInstallable())
     return onInstallable(setCanInstall)
   }, [])
@@ -141,7 +145,7 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
             注意：小米/红米浏览器（MiuiBrowser）几乎不触发 beforeinstallprompt，
             此前 canInstall 恒为 false 导致整个安装入口在 MIUI 上「消失」，
             所以这里不依赖 canInstall，仅在已安装（standalone）时隐藏。 */}
-        {!isInStandalone && (
+        {!isNativeApp && !isInStandalone && (
           <div className="bg-primary rounded-2xl shadow-card overflow-hidden">
             <button
               onClick={() => {
@@ -225,7 +229,9 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
         </div>
 
         <AssistantSettings />
-        {/* 数据同步（Supabase，本地优先） */}
+        {isNativeApp && <DeviceSyncSettings />}
+        {/* 网页版原有同步入口，APK 使用独立的数据同步。 */}
+        {!isNativeApp && <>
         <button
           onClick={() => setShowSync(true)}
           className="w-full bg-white rounded-2xl shadow-card overflow-hidden p-4 text-left active:bg-gray-50 transition-colors"
@@ -252,6 +258,7 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
           </p>
         </button>
 
+        </>}
         {/* 待办提醒总开关 */}
         <div className="bg-white rounded-2xl shadow-card overflow-hidden">
           <div className="w-full flex items-center gap-3 px-4 py-3 border-b border-gray-50">
@@ -548,7 +555,7 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
       />
 
       <SyncModal
-        open={showSync}
+        open={!isNativeApp && showSync}
         onClose={() => setShowSync(false)}
         settings={settings}
         onSettingsChange={(patch) => updateSettings(patch)}

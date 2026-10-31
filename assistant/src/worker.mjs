@@ -194,8 +194,13 @@ export default {
     if (url.pathname==='/health' && request.method==='GET') return respond({ok:true});
     const token=request.headers.get('Authorization')?.replace(/^Bearer /,'') || '';
     const admin=await secretEqual(token,env.ADMIN_TOKEN);
-    if (!admin && (url.pathname.startsWith('/admin/') || !await secretEqual(token,env.DEVICE_TOKEN))) return respond({error:'unauthorized'},401);
+    const devicePairing=request.method==='POST' && url.pathname==='/v1/device-pair';
+    if (!devicePairing && !admin && (url.pathname.startsWith('/admin/') || !await secretEqual(token,env.DEVICE_TOKEN))) return respond({error:'unauthorized'},401);
     try {
+      if(request.method==='GET' && url.pathname==='/v1/data-sync') {
+        const row=await env.DB.prepare('SELECT version,box FROM private_vault WHERE id=1').first();
+        return respond(row?{version:row.version,box:JSON.parse(row.box)}:{version:0,box:null});
+      }
       if (request.method==='GET' && url.pathname==='/v1/bookkeeping') {
         const items=await mutate(env,s=>{expireBookkeeping(s);return s.bookkeeping;});
         return respond({items});
@@ -205,9 +210,38 @@ export default {
         return respond({tasks:state.tasks.map(t=>({...safeTask(t),version:t.version,updatedAt:t.updatedAt})),deliveryError:!!state.deliveryError,connected:!!state.botToken});
       }
       if (request.method==='POST') {
-        if (Number(request.headers.get('Content-Length') || 0)>32768) return respond({error:'too_large'},413);
-        const raw=await request.text(); if(encoder.encode(raw).length>32768)return respond({error:'too_large'},413);
+        const maxBytes=url.pathname==='/v1/data-sync'?750000:32768;
+        if (Number(request.headers.get('Content-Length') || 0)>maxBytes) return respond({error:'too_large'},413);
+        const raw=await request.text(); if(encoder.encode(raw).length>maxBytes)return respond({error:'too_large'},413);
         const body=JSON.parse(raw || '{}');
+        if(devicePairing) {
+          if(typeof body.code!=='string'||!/^\d{8}$/.test(body.code))return respond({error:'invalid_pairing_code'},400);
+          const hash=b64(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(body.code))));
+          const accepted=await mutate(env,s=>{
+            const pair=s.devicePair;
+            if(!pair||pair.expiresAt<Date.now()||pair.attempts>=10)return false;
+            pair.attempts++;
+            if(pair.hash!==hash)return false;
+            delete s.devicePair;return true;
+          });
+          return accepted?respond({token:env.DEVICE_TOKEN}):respond({error:'pairing_code_rejected'},403);
+        }
+        if(admin && url.pathname==='/admin/device-pair') {
+          const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%100000000).padStart(8,'0');
+          const expiresAt=Date.now()+600000;
+          const hash=b64(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(code))));
+          await mutate(env,s=>{s.devicePair={hash,expiresAt,attempts:0};});
+          return respond({code,expiresAt});
+        }
+        if(url.pathname==='/v1/data-sync') {
+          const box=body.box,version=body.baseVersion;
+          if(!Number.isSafeInteger(version)||version<0||box?.schema!==1||typeof box.iv!=='string'||!/^[-A-Za-z0-9+/]{16}$/.test(box.iv)||typeof box.data!=='string'||box.data.length<24||box.data.length>710000||!/^[A-Za-z0-9+/]+={0,2}$/.test(box.data))return respond({error:'invalid_encrypted_data'},400);
+          const encoded=JSON.stringify({schema:1,iv:box.iv,data:box.data});
+          const saved=version===0
+            ? await env.DB.prepare('INSERT OR IGNORE INTO private_vault(id,version,box) VALUES(1,1,?)').bind(encoded).run()
+            : await env.DB.prepare('UPDATE private_vault SET version=version+1,box=? WHERE id=1 AND version=?').bind(encoded,version).run();
+          return saved.meta.changes===1?respond({version:version+1}):respond({error:'version_conflict'},409);
+        }
         if(admin && url.pathname==='/admin/interpret') {
           if(typeof body.text!=='string'||!body.text.trim()||body.text.length>2000)return respond({error:'invalid_text'},400);
           const {state}=await load(env);

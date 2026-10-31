@@ -9,6 +9,7 @@
  */
 
 import { useStore } from '@/store'
+import { Capacitor } from '@capacitor/core'
 import { pushOnly, isSyncing } from '@/services/cloudSync'
 import type { AppSettings } from '@/types'
 
@@ -27,6 +28,7 @@ const storeApi = useStore as unknown as {
 
 /** 初始化同步管理器。在 App 顶层调用一次即可，重复调用幂等。 */
 export function initSyncManager() {
+  if (Capacitor.isNativePlatform()) return
   if (started) return
   started = true
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { useStore } from './store'
 import { HomeScreen } from './screens/HomeScreen'
 import { ListScreen } from './screens/ListScreen'
@@ -55,7 +56,7 @@ export default function App() {
   // 云同步：初始化防抖自动 push 管理器；启动时若已启用且已配置，静默 pull 一次
   useEffect(() => {
     initSyncManager()
-    if (settings.cloudSyncEnabled && settings.supabaseUrl && settings.supabaseAnonKey) {
+    if (!Capacitor.isNativePlatform() && settings.cloudSyncEnabled && settings.supabaseUrl && settings.supabaseAnonKey) {
       // 后台静默拉取其它设备的新变更，不弹任何提示；失败也静默
       pullOnly(settings).then((r) => {
         if (r.ok && r.needReload) {

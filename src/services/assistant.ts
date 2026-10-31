@@ -84,6 +84,11 @@ export async function syncBookkeeping(config: AssistantConfig) {
 }
 
 let busy = false
+export function lockAssistantForDataSync() {
+  if(busy)throw new Error('微信日程正在同步，请稍后再进行全量数据同步')
+  busy=true
+  return ()=>{busy=false}
+}
 export async function syncAssistant() {
   const config = readAssistantConfig()
   if (!config?.enabled) throw new Error('请先配置并启用微信日程助手')
