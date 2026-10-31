@@ -21,6 +21,11 @@ export async function newDeviceCode():Promise<string>{
 }
 export async function saveDataConnection(url:string,token:string,key:string){
   if(!/^[a-fA-F0-9]{64}$/.test(key.trim()))throw new Error('请生成密钥或填写原设备的64位数据密钥')
+  const previous=readAssistantConfig()
+  if(key.trim().toLowerCase()!==readDataKey() || endpoint(url)!==previous?.url || token.trim()!==previous?.token){
+    const remote=await request(undefined,{url:endpoint(url),token:token.trim(),enabled:!!previous?.enabled})
+    if(remote.box)await decryptSnapshot(remote.box,key)
+  }
   await saveAssistantConfig({url,token,enabled:!!readAssistantConfig()?.enabled})
   appStorage.setItem(KEY,key.trim().toLowerCase());await flushPrivateStorage()
 }
@@ -29,8 +34,8 @@ export function captureSnapshot():Snapshot {
   const settings=JSON.parse(appStorage.getItem('wb.settings.v1')||'{}')
   return {schema:1,tables,preferences:Object.fromEntries(PREFERENCES.filter(key=>Object.prototype.hasOwnProperty.call(settings,key)).map(key=>[key,settings[key]]))}
 }
-async function request(data?:unknown){
-  const config=readAssistantConfig();if(!config?.url||!config.token)throw new Error('请先填写服务地址和服务连接密钥')
+async function request(data?:unknown,config=readAssistantConfig()){
+  if(!config?.url||!config.token)throw new Error('请先填写服务地址和服务连接密钥')
   const response=await fetch(endpoint(config.url)+'/v1/data-sync',{method:data?'POST':'GET',headers:{Authorization:`Bearer ${config.token}`,'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined,redirect:'error',signal:AbortSignal.timeout(20000),cache:'no-store'})
   if(response.status===409)throw new Error('另一台设备刚更新了数据，请重新同步；未覆盖其修改')
   if(!response.ok)throw new Error(`数据同步失败（${response.status}）`)

@@ -43,5 +43,8 @@ test('two devices merge new data, ask on conflicts, reject wrong keys and never 
   const retry=await service.prepareDataSync(),previous=[...b.entries()];fixtures.failSave=true;
   await assert.rejects(service.commitDataSync(retry),/disk_failure/);assert.deepEqual([...b.entries()],previous);
   fixtures.failSave=false;await service.commitDataSync(await service.prepareDataSync());
+  const savedKey=b.get('wb.sync.vault.key.v1');
+  await assert.rejects(service.saveDataConnection(fixtures.config.url,fixtures.config.token,'56'.repeat(32)),/无法解密/);
+  assert.equal(b.get('wb.sync.vault.key.v1'),savedKey);
  }finally{globalThis.fetch=original;delete globalThis.vaultTest}
 });
