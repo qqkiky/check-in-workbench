@@ -5,7 +5,7 @@ test('two devices merge new data, ask on conflicts, reject wrong keys and never 
  const fixtures={values:new Map(),config:{url:'https://sync.example',token:'test-connection-token-at-least-32chars',enabled:false}};
  globalThis.vaultTest=fixtures;
  const modules={
-  './appStorage':`export const appStorage={getItem:k=>globalThis.vaultTest.values.get(k),setItem:(k,v)=>globalThis.vaultTest.values.set(k,v)};export const flushPrivateStorage=async()=>{};`,
+  './appStorage':`export const appStorage={getItem:k=>globalThis.vaultTest.values.get(k),setItem:(k,v)=>globalThis.vaultTest.values.set(k,v)};export const flushPrivateStorage=async()=>{};export const saveStorageBatch=async updates=>{if(globalThis.vaultTest.failSave)throw new Error('disk_failure');for(const [k,v] of Object.entries(updates))globalThis.vaultTest.values.set(k,v)};`,
   '@/store':`export const useStore={getState:()=>({reload(){}})};`,
   './assistant':`export const endpoint=u=>new URL(u).origin;export const readAssistantConfig=()=>globalThis.vaultTest.config;export const saveAssistantConfig=async c=>{globalThis.vaultTest.config=c};export const lockAssistantForDataSync=()=>()=>{};`,
  };
@@ -39,5 +39,9 @@ test('two devices merge new data, ask on conflicts, reject wrong keys and never 
   await assert.rejects(service.commitDataSync(stale),/另一台设备/);
   const before=posts;b.set('wb.sync.vault.key.v1','34'.repeat(32));
   await assert.rejects(service.prepareDataSync(),/无法解密/);assert.equal(posts,before);
+  b.set('wb.sync.vault.key.v1',key);
+  const retry=await service.prepareDataSync(),previous=[...b.entries()];fixtures.failSave=true;
+  await assert.rejects(service.commitDataSync(retry),/disk_failure/);assert.deepEqual([...b.entries()],previous);
+  fixtures.failSave=false;await service.commitDataSync(await service.prepareDataSync());
  }finally{globalThis.fetch=original;delete globalThis.vaultTest}
 });

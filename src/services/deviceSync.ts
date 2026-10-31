@@ -1,4 +1,4 @@
-import { appStorage, flushPrivateStorage } from './appStorage'
+import { appStorage, flushPrivateStorage, saveStorageBatch } from './appStorage'
 import { useStore } from '@/store'
 import { endpoint, readAssistantConfig, saveAssistantConfig, lockAssistantForDataSync } from './assistant'
 import { TABLES,PREFERENCES,canonical,mergeSnapshots,encryptSnapshot,decryptSnapshot,type Snapshot,type Choices,type VaultBox } from './vault'
@@ -61,14 +61,13 @@ export async function commitDataSync(plan:SyncPlan,choices:Choices={}){
     if(await binding()!==plan.binding || canonical(captureSnapshot())!==canonical(plan.local))throw new Error('本机数据或连接已变化，请重新同步')
     const result=await request({baseVersion:plan.version,box})
     if(await binding()!==plan.binding || canonical(captureSnapshot())!==canonical(plan.local))throw new Error('云端已接收；本机又有新修改，请再次同步以合并，尚未覆盖本机')
-    for(const key of TABLES)appStorage.setItem(key,JSON.stringify(merged.tables[key]))
+    const updates:Record<string,string>=Object.fromEntries(TABLES.map(key=>[key,JSON.stringify(merged.tables[key])]))
     const settings=JSON.parse(appStorage.getItem('wb.settings.v1')||'{}')
     for(const key of PREFERENCES)delete settings[key]
-    appStorage.setItem('wb.settings.v1',JSON.stringify({...settings,...merged.preferences}))
-    appStorage.setItem('wb.initialized.v1','1')
-    await flushPrivateStorage()
-    appStorage.setItem(BASE,JSON.stringify({binding:plan.binding,snapshot:merged,version:result.version}))
-    await flushPrivateStorage();useStore.getState().reload()
+    updates['wb.settings.v1']=JSON.stringify({...settings,...merged.preferences})
+    updates['wb.initialized.v1']='1'
+    updates[BASE]=JSON.stringify({binding:plan.binding,snapshot:merged,version:result.version})
+    await saveStorageBatch(updates);useStore.getState().reload()
     return result.version
   }finally{committing=false;releaseAssistant()}
 }

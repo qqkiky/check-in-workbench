@@ -64,3 +64,10 @@ export async function flushPrivateStorage() {
   await queue
   if (writeError) throw writeError
 }
+
+// NativeStorage.save replaces one encrypted AtomicFile, including the sync baseline.
+export async function saveStorageBatch(updates: Record<string,string>) {
+  if(!ready)throw new Error('Private storage has not been initialized')
+  if(native){values=Object.assign(Object.create(null),values,updates);persist();await flushPrivateStorage()}
+  else for(const [key,value] of Object.entries(updates))localStorage.setItem(key,value)
+}
