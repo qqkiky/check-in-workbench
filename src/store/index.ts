@@ -32,6 +32,7 @@ interface StoreState {
   reorderTasks: (ids: string[]) => void
 
   addRecord: (record: Omit<CheckInRecord, 'id'>) => void
+  updateRecord: (id: string, patch: Pick<CheckInRecord, 'completedAt' | 'durationSeconds'>) => void
   deleteRecord: (id: string) => void
 
   addCategory: (cat: Omit<Category, 'id'>) => string
@@ -214,6 +215,15 @@ export const useStore = create<StoreState>((set, get) => ({
     storage.setRecords(next)
     set({ records: next })
     const task = get().tasks.find(task => task.id === record.taskId)
+    if (task) void syncTaskToCalendar(task, next)
+  },
+
+  updateRecord(id, patch) {
+    const next = get().records.map(record => record.id === id ? { ...record, ...patch } : record)
+    storage.setRecords(next)
+    set({ records: next })
+    const record = next.find(record => record.id === id)
+    const task = get().tasks.find(task => task.id === record?.taskId)
     if (task) void syncTaskToCalendar(task, next)
   },
 

@@ -7,6 +7,7 @@ import { Icons } from '@/components/common/Icons'
 import { CategoryIcon } from '@/utils/iconLibrary'
 import { secondsToHuman, dt } from '@/utils/date'
 import { recurrenceShortLabel } from '@/utils/recurrence'
+import { habitBackground } from '@/services/todayAgenda'
 
 interface TaskCardProps {
   task: Task & { completed: boolean; record?: CheckInRecord }
@@ -87,6 +88,7 @@ export function TaskCard({ task, category, onCheckIn, onDetail, onArchive, onRes
       <div
         className={`bg-white ${padding} cursor-pointer card-hover transition-shadow ${compact ? '' : 'shadow-card rounded-2xl'}`}
         onClick={onDetail}
+        style={{ backgroundColor: habitBackground(task, category?.color) }}
       >
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-2">
@@ -146,7 +148,7 @@ export function TaskCard({ task, category, onCheckIn, onDetail, onArchive, onRes
   })()
 
   return (
-    <div className={`bg-white ${padding} ${compact ? '' : 'shadow-card rounded-2xl'} card-hover transition-shadow`}>
+    <div className={`bg-white ${padding} ${compact ? '' : 'shadow-card rounded-2xl'} card-hover transition-shadow`} style={{ backgroundColor: habitBackground(task, category?.color) }}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">

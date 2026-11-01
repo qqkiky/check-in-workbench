@@ -39,7 +39,8 @@ export async function saveAgentHistory(history:AgentHistory) {
   if(typeof window!=='undefined')window.dispatchEvent(new Event('agent-history-saved'))
 }
 export async function clearAgentHistory(){appStorage.removeItem(HISTORY);await flushPrivateStorage()}
-const strings=['query','title','content','date','time','targetDate','startDate','endDate','recurrence','type','account','category','note','name','accountType','fromAccount','toAccount']
+const strings=['query','title','content','date','time','completedDate','completedTime','targetDate','startDate','endDate','recurrence','type','account','category','note','name','accountType','fromAccount','toAccount']
+const COMPLETION_RULES='\n完成与完成时间：complete_task用于标记完成，可带completedTime(HH:mm)和completedDate(YYYY-MM-DD)表示实际完成时间。update_completion_time专门更正已有完成记录，必须带query和completedTime；date/targetDate定位任务实例所属日，completedDate是实际完成日，没说实际日期时保留原完成日。时间更正不得使用update_task改变计划时间，不得使用reopen_task。reopen_task仅用于用户明确说取消打卡、撤销完成、还没完成、恢复待办。例：“下午3点完成了整理资料”调用complete_task或update_completion_time，completedTime=15:00；“完成时间不是3点，是4点”调用update_completion_time，completedTime=16:00，原记录继续已完成。无法确定修改哪天哪条时只追问一个关键问题。'
 export const WORKBENCH_TOOL={type:'function',function:{name:'workbench',description:'操作期待中的本地日程、账目、账户、笔记和转账。返回的查询数据仅在手机显示，不会发给模型。',parameters:{type:'object',properties:{action:{type:'string',enum:AGENT_ACTIONS},...Object.fromEntries(strings.map(key=>[key,{type:'string'}])),...Object.fromEntries(['duration','monthDay','amountCents','initialBalanceCents','feeCents'].map(key=>[key,{type:'integer'}])),weekdays:{type:'array',items:{type:'integer'}}},required:['action'],additionalProperties:false}}}
 function systemPrompt() {
   const now=new Date()
@@ -48,7 +49,7 @@ function systemPrompt() {
 export async function requestAgent(config:AgentConfig,messages:AgentMessage[],tools=true) {
   const url=agentEndpoint(config.url)
   const fast=['api.deepseek.com','ark.cn-beijing.volces.com'].includes(new URL(url).hostname)
-  const body={model:config.model,messages:[{role:'system',content:systemPrompt()},...messages],stream:false,...(fast?{thinking:{type:'disabled'}}:{}),...(tools?{tools:[WORKBENCH_TOOL],tool_choice:'auto'}:{})}
+  const body={model:config.model,messages:[{role:'system',content:systemPrompt()+COMPLETION_RULES},...messages],stream:false,...(fast?{thinking:{type:'disabled'}}:{}),...(tools?{tools:[WORKBENCH_TOOL],tool_choice:'auto'}:{})}
   if(Capacitor.getPlatform()==='android')return AgentHttp.request({url,key:config.key,body})
   const response=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${config.key}`,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(90000)})
   if(!response.ok)throw new Error(`AI 服务请求失败（${response.status}），请检查地址、密钥和模型名`)
@@ -78,7 +79,14 @@ export async function chatWithAgent(config:AgentConfig,history:AgentHistory,inpu
     const results:AgentResult[]=[]
     for(let i=0;i<parsed.length;i++) {
       let result:AgentResult
-      try{if(!sameConnection())throw new Error('服务配置已改变，未执行本次操作，请重新发送');result=await executeWorkbench(parsed[i])}catch(error){result={text:error instanceof Error?error.message:'操作失败',modelStatus:'未执行成功。'+(error instanceof Error?error.message:'请补充信息')}}
+      try{
+        if(!sameConnection())throw new Error('服务配置已改变，未执行本次操作，请重新发送')
+        const undo=/(取消.{0,12}(完成|打卡)|撤销|恢复.{0,12}(待办|未完成)|未完成|没(?:有)?(?:做完|完成)|还没|重做|重新做)/.test(input)
+        if(parsed[i].action==='reopen_task'&&!undo)throw new Error('没有收到明确取消完成的意思；如果是修改完成时间，本次保留原完成记录')
+        const completing=/(完成(?:的)?时间|[\d一二两三四五六七八九十][点:：].{0,12}(完成|做完|搞定)|(?:完成|做完|搞定)(?:于|在).{0,8}[\d一二两三四五六七八九十][点:：])/.test(input)
+        if(!undo&&completing&&(parsed[i].action==='reopen_task'||parsed[i].action==='update_task'&&(parsed[i].time!==undefined||parsed[i].date!==undefined)))throw new Error('你是在报告完成或更正完成时间，本次保留完成状态和原计划；请明确事项及实际完成时间')
+        result=await executeWorkbench(parsed[i])
+      }catch(error){result={text:error instanceof Error?error.message:'操作失败',modelStatus:'未执行成功。'+(error instanceof Error?error.message:'请补充信息')}}
       result.callId=calls[i].id;results.push(result)
       messages.push({role:'tool',tool_call_id:calls[i].id,content:JSON.stringify({status:result.modelStatus})})
     }

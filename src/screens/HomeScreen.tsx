@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@/store'
 import { TaskCard } from '@/components/tasks/TaskCard'
 import { Icons } from '@/components/common/Icons'
@@ -13,10 +13,12 @@ import { getUpcomingEvents, daysUntil } from '@/utils/events'
 import type { Task, Category, CheckInRecord, TimelineEntry } from '@/types'
 import { APP_NAME } from '@/types'
 import { APP_VERSION } from '@/version'
+import { TodayAgenda } from '@/components/tasks/TodayAgenda'
+import { buildTodayAgenda } from '@/services/todayAgenda'
 
 type DayTab = 'today' | 'week' | 'quick'
 
-export function HomeScreen() {
+export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenAgent?:()=>void}) {
   const {
     tasks,
     categories,
@@ -30,9 +32,10 @@ export function HomeScreen() {
     updateTimelineEntry,
     deleteTimelineEntry,
     updateSettings,
-    settings,
   } = useStore()
-  const today = useMemo(() => new Date(), [])
+  const [clock,setClock] = useState(() => new Date())
+  const today = useMemo(() => dt.startOfDay(clock), [fmtDate(clock)])
+  useEffect(() => { const timer=setInterval(() => setClock(new Date()),30000); return () => clearInterval(timer) }, [])
   const [viewMode, setViewMode] = useState<DayTab>('today')
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -45,11 +48,13 @@ export function HomeScreen() {
   const [pendingCheckIn, setPendingCheckIn] = useState<{
     taskId: string
     dateKey: string
+    completedDate: string
     defaultStart: string
     defaultEnd: string
   } | null>(null)
   // 时间线（日历记事本）开关与「记一笔」弹窗
-  const [showTimeline, setShowTimeline] = useState<boolean>(settings.showTimeline ?? true)
+  const [showTimeline, setShowTimeline] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const [noteModal, setNoteModal] = useState<{ date: string; startTime: string; entry?: TimelineEntry } | null>(null)
 
   const toggleTimeline = (next: boolean) => {
@@ -73,10 +78,6 @@ export function HomeScreen() {
         .slice(0, 8),
     [upcomingEvents, today]
   )
-  const nearestEventDays =
-    futureEvents.length > 0 && futureEvents[0].date
-      ? daysUntil(today, futureEvents[0].date)
-      : null
 
   // ===== 周视图：跟随所查看日期所在的周 =====
   const weekStart = useMemo(() => dt.startOfWeek(viewDate, 1), [viewDate])
@@ -139,24 +140,7 @@ export function HomeScreen() {
     return groups
   }, [weekTaskInstances, weekDateKeys, records])
 
-  // 日视图（任意聚焦日期）的任务 = 周分组中属于该日期的实例，保证与周视图完全一致
-  const dayInstances = useMemo(
-    () => weekTaskInstances.filter((i) => i.dateKey === viewDateKey),
-    [weekTaskInstances, viewDateKey]
-  )
-  const dayTasks = useMemo(
-    () =>
-      dayInstances
-        .map(({ task }) => ({
-          ...task,
-          completed: records.some((r) => r.taskId === task.id && r.date === viewDateKey),
-          record: records.find((r) => r.taskId === task.id && r.date === viewDateKey),
-        }))
-        .sort((a, b) =>
-          (a.scheduledTime || '99:99').localeCompare(b.scheduledTime || '99:99')
-        ),
-    [dayInstances, records, viewDateKey, today]
-  )
+  const agenda = useMemo(() => buildTodayAgenda(tasks,records,viewDate,clock), [tasks,records,viewDate,clock])
 
   // ===== 公共 =====
   const quickTasks = useMemo(
@@ -185,7 +169,8 @@ export function HomeScreen() {
     // 普通任务：弹出时间选择，录入「日期 + 起止时间」用于「今日时间线」计算时长
     const now = new Date()
     const nowHHmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    const isPast = dateKey < fmtDate(today)
+    const completedDate = viewMode === 'today' && viewDateKey === fmtDate(today) && task.recurrence === 'none' && dateKey < viewDateKey ? viewDateKey : dateKey
+    const isPast = completedDate < fmtDate(today)
     // 补卡（过去日）：默认用计划时间预填合理时段；当天打卡默认用当前时间
     const defaultStart = task.scheduledTime || (isPast ? '09:00' : nowHHmm)
     const defaultEnd = isPast
@@ -193,18 +178,18 @@ export function HomeScreen() {
         ? shiftMinutes(task.scheduledTime, 30)
         : '09:30'
       : nowHHmm
-    setPendingCheckIn({ taskId, dateKey, defaultStart, defaultEnd })
+    setPendingCheckIn({ taskId, dateKey, completedDate, defaultStart, defaultEnd })
   }
 
   // 写入一条打卡记录；start/end 为 HH:mm（小事为 null → 仅记录完成时间，时长为 0）
-  const doCheckIn = (task: Task, dateKey: string, start: string | null, end: string | null) => {
+  const doCheckIn = (task: Task, dateKey: string, start: string | null, end: string | null, completedDate = dateKey) => {
     let startedAt: number | undefined
     let completedAt = Date.now()
     let durationSeconds = 0
     if (start && end) {
       const [sh, sm] = start.split(':').map(Number)
       const [eh, em] = end.split(':').map(Number)
-      const [Y, M, D] = dateKey.split('-').map(Number)
+      const [Y, M, D] = completedDate.split('-').map(Number)
       startedAt = new Date(Y, M - 1, D, sh, sm, 0, 0).getTime()
       completedAt = new Date(Y, M - 1, D, eh, em, 0, 0).getTime()
       if (completedAt < startedAt) {
@@ -234,7 +219,7 @@ export function HomeScreen() {
     if (!pendingCheckIn) return
     const task = tasks.find((t) => t.id === pendingCheckIn.taskId)
     setPendingCheckIn(null)
-    if (task) doCheckIn(task, date, start, end)
+    if (task) doCheckIn(task, pendingCheckIn.dateKey, start, end, date)
   }
 
   const addQuick = () => {
@@ -289,137 +274,31 @@ export function HomeScreen() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="px-4 pt-3 pb-2 bg-[#F2F2F7]">
-        <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => setShowEvents(true)}
-            className="relative w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary active:scale-95"
-            aria-label="查看即将到来的节气与节日"
-          >
-            <Icons.Clock size={18} />
-            {nearestEventDays != null && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-500 text-white text-[10px] font-semibold flex items-center justify-center leading-none">
-                {nearestEventDays}天
-              </span>
-            )}
-          </button>
-          <div className="text-2xl font-light tracking-tight text-gray-900">{APP_NAME}</div>
-          <button
-            onClick={openAdd}
-            className="w-9 h-9 rounded-full bg-white shadow-card flex items-center justify-center text-primary text-xl active:scale-95"
-            aria-label="新增任务"
-          >
-            +
-          </button>
-        </div>
-        {viewMode !== 'quick' ? (
+      <header className="agenda-header">
+        <button className="agenda-brand" onClick={() => setShowEvents(true)} aria-label="查看即将到来的节气与节日">{APP_NAME}</button>
+        <div className="agenda-title-row">
+          <h1>{viewMode === 'quick' ? '小事' : viewMode === 'week' ? (isCurrentWeek ? '本周' : '所选周') : viewDateKey === fmtDate(today) ? '今天' : dt.format(viewDate, 'MM月dd日')}<span className="agenda-cover-date"> · {dt.format(viewDate, 'MM/dd')}</span></h1>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => shiftViewDate(viewMode === 'week' ? -7 : -1)}
-              className="w-9 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-gray-600 active:scale-95"
-              aria-label={viewMode === 'week' ? '上一周' : '上一天'}
-            >
-              <Icons.ChevronLeft size={18} />
-            </button>
-            <label className="relative flex-1 min-w-0 rounded-xl bg-white py-1.5 text-center cursor-pointer">
-              <span className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-800 whitespace-nowrap">
-                <Icons.Calendar size={14} />
-                {viewMode === 'week'
-                  ? `${dt.format(weekStart, 'yyyy/MM/dd')}–${dt.format(weekDates[6], weekStart.getFullYear() === weekDates[6].getFullYear() ? 'MM/dd' : 'yyyy/MM/dd')}`
-                  : dt.format(viewDate, 'yyyy/MM/dd')}
-              </span>
-              <span className="block text-[10px] text-gray-400">
-                {viewMode === 'week' ? '选择日期查看所在周' : `${dt.format(viewDate, 'EEEE')} ${getLunarDay(viewDate)}`}
-              </span>
-              <input
-                type="date"
-                value={viewDateKey}
-                onChange={(e) => changeDate(e.target.value)}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                aria-label="查看日期"
-              />
-            </label>
-            <button
-              onClick={() => shiftViewDate(viewMode === 'week' ? 7 : 1)}
-              className="w-9 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-gray-600 active:scale-95"
-              aria-label={viewMode === 'week' ? '下一周' : '下一天'}
-            >
-              <Icons.ChevronRight size={18} />
-            </button>
-            <button
-              onClick={() => setFocusDate(null)}
-              disabled={viewMode === 'week' ? isCurrentWeek : viewDateKey === fmtDate(today)}
-              className="shrink-0 px-2 h-10 rounded-xl bg-primary/10 text-primary text-xs active:scale-95 disabled:opacity-40"
-              aria-label={viewMode === 'week' ? '回到本周' : '回到今天'}
-            >
-              {viewMode === 'week' ? '本周' : '今天'}
-            </button>
+            <button className="agenda-header-action" onClick={() => setShowDatePicker(true)} aria-label="切换日期与视图"><Icons.Calendar size={20}/></button>
+            <button className="agenda-header-action text-primary" onClick={openAdd} aria-label="新增任务">＋</button>
           </div>
-        ) : <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="font-semibold text-gray-700">{dt.format(today, 'EEEE')}</span>
-            <span>{dt.format(today, 'yyyy/MM/dd')}</span>
-            <span className="text-gray-400">{getLunarDay(today)}</span>
-          </div>
-        </div>}
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex bg-gray-100 rounded-full p-0.5">
-            {viewTabs.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => {
-                  setViewMode(m.key)
-                }}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                  viewMode === m.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-          {viewMode === 'today' && (
-            <span className="text-[11px] text-gray-400">
-              {dayTasks.filter((t) => t.completed).length}/{dayTasks.length} 已完成
-            </span>
-          )}
+        </div>
+        <div className="agenda-date-browse">
+          <button onClick={() => shiftViewDate(viewMode === 'week' ? -7 : -1)} aria-label={viewMode === 'week' ? '上一周' : '上一天'}><Icons.ChevronLeft size={16}/></button>
+          <button className="agenda-date-label" onClick={() => setShowDatePicker(true)}>{viewMode === 'week' ? `${dt.format(weekStart, 'MM/dd')} – ${dt.format(weekDates[6], 'MM/dd')}` : `${dt.format(viewDate, 'MM月dd日')} ${dt.format(viewDate, 'EEEE')}`}</button>
+          <button onClick={() => shiftViewDate(viewMode === 'week' ? 7 : 1)} aria-label={viewMode === 'week' ? '下一周' : '下一天'}><Icons.ChevronRight size={16}/></button>
+          {viewDateKey !== fmtDate(today) && <button className="ml-auto text-primary" onClick={() => setFocusDate(null)}>今天</button>}
+          <button className="ml-auto text-primary" onClick={() => setShowDatePicker(true)}>{viewMode === 'week' ? '周视图' : viewMode === 'quick' ? '小事' : '日视图'}</button>
         </div>
       </header>
-
-      <div className="flex-1 overflow-y-auto px-3 pb-24">
-        {viewMode === 'today' && (
-          <TodayView
-            dayTasks={dayTasks}
-            records={records}
-            entries={timelineEntries}
-            categories={categories}
-            viewDate={viewDate}
-            viewDateKey={viewDateKey}
-            focused={viewDateKey !== fmtDate(today)}
-            showTimeline={showTimeline}
-            onToggleTimeline={toggleTimeline}
-            onAddNote={openAddNote}
-            onDeleteEntry={deleteTimelineEntry}
-            onEditEntry={openEditNote}
-            onPrevDay={timelinePrevDay}
-            onNextDay={timelineNextDay}
-            onPickDate={timelinePickDate}
-            timelineDate={timelineDate}
-            onCheckIn={(taskId, done) => handleCheckIn(taskId, done, viewDateKey)}
-            onAdd={openAdd}
-            onBack={() => {
-              setViewMode('week')
-            }}
-            onArchive={(id) => {
-              archiveTask(id)
-              showToast('已归档')
-            }}
-            onEdit={(id) => {
-              setEditingTaskId(id)
-              setShowForm(true)
-            }}
-          />
-        )}
+      <div className="agenda-scroll flex-1 overflow-y-auto">
+        {viewMode === 'today' && <>
+          <TodayAgenda agenda={agenda} categories={categories} compact={compact} onCheckIn={handleCheckIn} onEdit={id => {setEditingTaskId(id);setShowForm(true)}} onAdd={openAdd}/>
+          <div className="agenda-timeline">
+            <button className="text-sm text-gray-500 py-3" aria-expanded={showTimeline} onClick={() => toggleTimeline(!showTimeline)}>{showTimeline ? '收起时间线' : '查看时间线'}</button>
+            {showTimeline && <TodayTimeline records={records} entries={timelineEntries} categories={categories} dateKey={timelineDate} title="时间线" onAddNote={openAddNote} onDeleteEntry={deleteTimelineEntry} onEditEntry={openEditNote} onPrevDay={timelinePrevDay} onNextDay={timelineNextDay} onPickDate={timelinePickDate}/>}
+          </div>
+        </>}
 
         {viewMode === 'week' && (
           <WeekView
@@ -476,8 +355,8 @@ export function HomeScreen() {
                     key={t.id}
                     id={t.id}
                     title={t.title}
-                    done={!!records.find((r) => r.taskId === t.id && r.date === fmtDate(new Date()))}
-                    onToggle={(done) => handleCheckIn(t.id, done, fmtDate(new Date()))}
+                    done={records.some((r) => r.taskId === t.id)}
+                    onToggle={(done) => handleCheckIn(t.id, done, records.find(r => r.taskId === t.id)?.date || fmtDate(new Date()))}
                     onArchive={() => {
                       archiveTask(t.id)
                       showToast('已归档')
@@ -489,8 +368,22 @@ export function HomeScreen() {
           </div>
         )}
 
-        <div className="pt-4 pb-2 text-center text-[10px] text-gray-300">打卡 v {APP_VERSION}</div>
+        <div className="agenda-version pt-4 pb-2 text-center text-[10px] text-gray-300">打卡 v {APP_VERSION}</div>
       </div>
+
+      {onOpenAgent && !compact && <div className="agenda-voice"><button onClick={onOpenAgent}><Icons.Mic size={17}/>对助手说</button></div>}
+
+      <Modal open={showDatePicker} onClose={() => setShowDatePicker(false)} title="日期与视图">
+        <div className="space-y-4">
+          <div className="flex gap-2">{viewTabs.map(tab => <button key={tab.key} className={`flex-1 py-3 rounded-xl ${viewMode === tab.key ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`} onClick={() => {setViewMode(tab.key);setShowDatePicker(false)}}>{tab.label}</button>)}</div>
+          <input aria-label="查看日期" type="date" className="w-full p-3 border rounded-xl text-base" value={viewDateKey} onChange={event => {changeDate(event.target.value);setShowDatePicker(false)}}/>
+          <div className="flex gap-2">
+            <button className="flex-1 py-3 bg-gray-100 rounded-xl" onClick={() => {shiftViewDate(viewMode === 'week' ? -7 : -1);setShowDatePicker(false)}}>{viewMode === 'week' ? '上一周' : '上一天'}</button>
+            <button className="flex-1 py-3 bg-gray-100 rounded-xl" onClick={() => {shiftViewDate(viewMode === 'week' ? 7 : 1);setShowDatePicker(false)}}>{viewMode === 'week' ? '下一周' : '下一天'}</button>
+          </div>
+          <button className="w-full text-primary py-3" onClick={() => {setFocusDate(null);setViewMode('today');setShowDatePicker(false)}}>回到今天</button>
+        </div>
+      </Modal>
 
       <TaskFormModal
         open={showForm}
@@ -507,7 +400,7 @@ export function HomeScreen() {
       <CheckInTimeModal
         open={!!pendingCheckIn}
         taskTitle={pendingCheckIn ? (tasks.find((t) => t.id === pendingCheckIn.taskId)?.title ?? '') : ''}
-        defaultDate={pendingCheckIn?.dateKey || fmtDate(today)}
+        defaultDate={pendingCheckIn?.completedDate || fmtDate(today)}
         defaultStart={pendingCheckIn?.defaultStart || '09:00'}
         defaultEnd={pendingCheckIn?.defaultEnd || '09:30'}
         onClose={() => setPendingCheckIn(null)}
@@ -568,145 +461,6 @@ export function HomeScreen() {
         <p className="mt-3 text-[11px] text-gray-400 text-center">未来 120 天内的节气与节日</p>
       </Modal>
     </div>
-  )
-}
-
-// ============== 日视图组件（可展示任意聚焦日期） ==============
-function TodayView({
-  dayTasks,
-  records,
-  entries,
-  categories,
-  viewDate,
-  viewDateKey,
-  focused,
-  showTimeline,
-  onToggleTimeline,
-  onAddNote,
-  onDeleteEntry,
-  onEditEntry,
-  onPrevDay,
-  onNextDay,
-  onPickDate,
-  timelineDate,
-  onCheckIn,
-  onArchive,
-  onEdit,
-  onAdd,
-  onBack,
-}: {
-  dayTasks: Array<Task & { completed: boolean; record?: any; checkInState?: 'normal' | 'makeup' | 'makeup-expired' }>
-  records: CheckInRecord[]
-  entries: TimelineEntry[]
-  categories: Category[]
-  viewDate: Date
-  viewDateKey: string
-  focused: boolean
-  showTimeline: boolean
-  onToggleTimeline: (next: boolean) => void
-  onAddNote: () => void
-  onDeleteEntry: (id: string) => void
-  onEditEntry: (entry: TimelineEntry) => void
-  onPrevDay: () => void
-  onNextDay: () => void
-  onPickDate: (date: string) => void
-  timelineDate: string
-  onCheckIn: (id: string, done: boolean) => void
-  onArchive: (id: string) => void
-  onEdit: (id: string) => void
-  onAdd: () => void
-  onBack: () => void
-}) {
-  return (
-    <>
-      {/* 聚焦某天时显示返回条 */}
-      {focused && (
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white shadow-card text-sm text-gray-700 active:scale-95"
-            aria-label="返回周视图"
-          >
-            <Icons.ChevronLeft size={16} /> 返回周
-          </button>
-          <span className="text-sm font-semibold text-gray-800">
-            {dt.format(viewDate, 'MM月dd日')} {dt.format(viewDate, 'EEEE')}
-          </span>
-          <span className="text-[11px] text-gray-400">{getLunarDay(viewDate)}</span>
-        </div>
-      )}
-
-      {/* 待办 */}
-      <div className="mt-4">
-        <div className="flex items-center justify-between px-2 mb-2">
-          <h3 className="text-sm font-semibold text-gray-800">
-            {focused ? '当日待办' : '今日待办'}
-          </h3>
-          <div className="flex items-center gap-2">
-            {/* 时间线开关：在「今日待办」旁提供可选项 */}
-            <button
-              onClick={() => onToggleTimeline(!showTimeline)}
-              className="flex items-center gap-1.5 text-[11px] active:scale-95"
-              aria-pressed={showTimeline}
-            >
-              <span className={`w-8 h-5 rounded-full transition-colors relative ${showTimeline ? 'bg-primary' : 'bg-gray-300'}`}>
-                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${showTimeline ? 'left-[18px]' : 'left-0.5'}`} />
-              </span>
-              <span className={showTimeline ? 'text-primary' : 'text-gray-400'}>时间线</span>
-            </button>
-            <span className="text-[10px] text-gray-400">{viewDateKey}</span>
-          </div>
-        </div>
-        {dayTasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl shadow-card text-gray-400">
-            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3 text-gray-300">
-              <Icons.Calendar size={28} />
-            </div>
-            <p className="text-sm">这一天还没有待办</p>
-            <button
-              onClick={onAdd}
-              className="mt-3 px-4 py-2 bg-primary text-white rounded-full text-sm font-medium active:scale-95"
-            >
-              添加一个
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {dayTasks.map((task) => {
-              const cat = categories.find((c) => c.id === task.categoryId)
-              return (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  category={cat}
-                  taskDate={viewDateKey}
-                  onCheckIn={() => onCheckIn(task.id, task.completed)}
-                  onArchive={() => onArchive(task.id)}
-                  onDetail={() => onEdit(task.id)}
-                />
-              )
-            })}
-          </div>
-        )}
-
-        {/* 当日时间线（日历记事本）：打卡内容自动汇入 + 可手写非打卡内容 + 跨天浏览 */}
-        {showTimeline && (
-          <TodayTimeline
-            records={records}
-            entries={entries}
-            categories={categories}
-            dateKey={timelineDate}
-            title="时间线"
-            onAddNote={onAddNote}
-            onDeleteEntry={onDeleteEntry}
-            onEditEntry={onEditEntry}
-            onPrevDay={onPrevDay}
-            onNextDay={onNextDay}
-            onPickDate={onPickDate}
-          />
-        )}
-      </div>
-    </>
   )
 }
 

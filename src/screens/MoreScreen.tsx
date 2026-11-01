@@ -18,7 +18,7 @@ import { THEME_PRESETS } from '@/utils/theme'
 import { AssistantSettings } from '@/components/AssistantSettings'
 import { DeviceSyncSettings } from '@/components/DeviceSyncSettings'
 
-export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => void; onOpenList?: () => void }) {
+export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNotes?: () => void; onOpenList?: () => void; onNavigate?: (tab:'account'|'timeline'|'info') => void }) {
   const isNativeApp = Capacitor.isNativePlatform()
   const { settings, updateSettings, reset, reload, restoreSnapshot, records, tasks, categories } = useStore()
   const [showAbout, setShowAbout] = useState(false)
@@ -141,6 +141,11 @@ export function MoreScreen({ onOpenNotes, onOpenList }: { onOpenNotes?: () => vo
       </header>
 
       <div className="flex-1 overflow-y-auto pb-24 px-3 space-y-3">
+        {onNavigate && <div className="grid grid-cols-3 gap-2 bg-white rounded-2xl p-2">
+          <button className="py-3 text-sm text-primary" onClick={() => onNavigate('account')}>记账</button>
+          <button className="py-3 text-sm text-primary" onClick={() => onNavigate('timeline')}>回顾</button>
+          <button className="py-3 text-sm text-primary" onClick={() => onNavigate('info')}>资讯</button>
+        </div>}
         {/* 只要尚未以 PWA 独立模式运行就显示安装入口。
             注意：小米/红米浏览器（MiuiBrowser）几乎不触发 beforeinstallprompt，
             此前 canInstall 恒为 false 导致整个安装入口在 MIUI 上「消失」，

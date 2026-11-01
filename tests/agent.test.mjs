@@ -57,6 +57,50 @@ test('money and accounts are explicit; moving a bill preserves identity and tran
  await a.executeWorkbench({action:'add_account',name:'储蓄',accountType:'bank',initialBalanceCents:0});assert.equal(f.state.accounts.length,3);
 });
 
+test('correcting completion time preserves the record, completion and planned schedule',async()=>{
+ const {fixture:f,service:a}=await load();
+ await a.executeWorkbench({action:'add_task',title:'完成时间测试',date:'2026-10-30',time:'17:00'});const task=f.state.tasks[0];
+ const record={id:'original-record',taskId:task.id,taskTitle:task.title,categoryId:'work',date:'2026-10-31',completedAt:new Date('2026-10-31T18:00:00').getTime(),durationSeconds:600,note:'keep-note',progress:2};
+ f.state.records=[record];
+ const result=await a.executeWorkbench({action:'update_completion_time',query:task.id,completedTime:'15:00'});
+ assert.equal(f.state.records.length,1);assert.equal(f.state.records[0].id,record.id);assert.equal(f.state.records[0].date,record.date);
+ assert.equal(f.state.records[0].completedAt,new Date('2026-10-31T15:00:00').getTime());assert.equal(f.state.records[0].note,'keep-note');assert.equal(f.state.records[0].progress,2);
+ assert.equal(task.scheduledTime,'17:00');assert.equal(task.scheduledDate,'2026-10-30');assert.match(result.text,/完成时间.*15:00/);
+ await a.executeWorkbench({action:'complete_task',query:task.id,time:'16:00'});assert.equal(new Date(f.state.records[0].completedAt).getHours(),16);assert.equal(f.state.records.length,1);
+ await assert.rejects(a.executeWorkbench({action:'reopen_task',query:task.id,time:'15:00'}),/完成时间/);assert.equal(f.state.records.length,1);
+});
+
+test('first completion honors the stated actual time while retaining its planned occurrence',async()=>{
+ const {fixture:f,service:a}=await load();
+ f.state.tasks=[{id:'once',title:'单次事项',recurrence:'none',scheduledDate:'2026-10-30',scheduledTime:'17:00',categoryId:'work'}];
+ await a.executeWorkbench({action:'complete_task',query:'once',completedDate:'2026-10-31',completedTime:'15:00'});
+ assert.equal(f.state.records.length,1);assert.equal(f.state.records[0].date,'2026-10-30');assert.equal(f.state.records[0].completedAt,new Date('2026-10-31T15:00:00').getTime());
+ const id=f.state.records[0].id;await a.executeWorkbench({action:'complete_task',query:'once'});assert.equal(f.state.records.length,1);assert.equal(f.state.records[0].id,id);assert.equal(new Date(f.state.records[0].completedAt).getHours(),15);
+});
+
+test('completion corrections validate timestamps and isolate recurring occurrences',async()=>{
+ const {fixture:f,service:a}=await load();
+ f.state.tasks=[{id:'habit',title:'习惯',categoryId:'study',recurrence:'daily',scheduledTime:'09:00'}];
+ f.state.records=[{id:'r1',taskId:'habit',date:'2026-10-29',completedAt:new Date('2026-10-29T18:00:00').getTime(),durationSeconds:0},{id:'r2',taskId:'habit',date:'2026-10-30',startedAt:new Date('2026-10-30T14:00:00').getTime(),completedAt:new Date('2026-10-30T18:00:00').getTime(),durationSeconds:14400}];
+ await a.executeWorkbench({action:'update_completion_time',query:'habit',date:'2026-10-30',completedTime:'15:00'});
+ assert.equal(new Date(f.state.records[0].completedAt).getHours(),18);assert.equal(new Date(f.state.records[1].completedAt).getHours(),15);assert.equal(f.state.records[1].durationSeconds,3600);
+ for(const patch of [{completedTime:'25:00'},{completedDate:'2026-02-30',completedTime:'15:00'},{completedDate:'2099-01-01',completedTime:'15:00'},{completedTime:'13:00'}])await assert.rejects(a.executeWorkbench({action:'update_completion_time',query:'habit',date:'2026-10-30',...patch}));
+ await assert.rejects(a.executeWorkbench({action:'update_completion_time',query:'habit',date:'2026-10-28',completedTime:'15:00'}),/完成记录/);
+ assert.equal(f.state.records.length,2);assert.equal(new Date(f.state.records[1].completedAt).getHours(),15);
+});
+
+test('a model cannot reopen a completed task when the user only corrects its completion time',async()=>{
+ const {fixture:f,service:a}=await load();const original=globalThis.fetch;
+ f.state.tasks=[{id:'task',title:'测试',recurrence:'none',scheduledDate:'2026-10-30',scheduledTime:'17:00'}];
+ f.state.records=[{id:'record',taskId:'task',date:'2026-10-30',completedAt:new Date('2026-10-30T18:00:00').getTime(),durationSeconds:0}];
+ globalThis.fetch=async()=>Response.json({choices:[{message:{tool_calls:[{id:'wrong',type:'function',function:{name:'workbench',arguments:JSON.stringify({action:'reopen_task',query:'task',date:'2026-10-30'})}}]}}]});
+ try{
+  const config={url:'https://api.example/v1',key:'fake',model:'fake'};
+  for(const input of ['这个事项是下午3点完成的，请修改完成时间','不，是下午4点']){const history=await a.chatWithAgent(config,{messages:[],entries:[]},input);assert.equal(f.state.records.length,1);assert.match(history.entries.at(-1).results[0].text,/完成时间/)}
+  await a.chatWithAgent(config,{messages:[],entries:[]},'取消这条任务的完成状态');assert.equal(f.state.records.length,0);
+ }finally{globalThis.fetch=original}
+});
+
 test('ambiguous targets and stale deletion approvals cannot delete or change records',async()=>{
  const {fixture:f,service:a}=await load();
  await a.executeWorkbench({action:'add_note',content:'测试笔记'});const id=f.state.notes[0].id;
@@ -68,6 +112,14 @@ test('ambiguous targets and stale deletion approvals cannot delete or change rec
  await assert.rejects(a.executeWorkbench({action:'complete_task',query:'写报告'}),/多条/);assert.equal(f.state.records.length,0);
  await assert.rejects(a.executeWorkbench({action:'eval',script:'anything'}),/不支持/);
  await assert.rejects(a.executeWorkbench({action:'add_note',content:'x',confirmed:true}),/不支持/);
+});
+
+test('completion-time protection still permits explicit rescheduling of an already completed task',async()=>{
+ const {fixture:f,service:a}=await load();const original=globalThis.fetch;
+ f.state.tasks=[{id:'task',title:'完成报告',recurrence:'none',scheduledDate:'2026-10-30',scheduledTime:'17:00'}];
+ f.state.records=[{id:'record',taskId:'task',date:'2026-10-30',completedAt:new Date('2026-10-30T18:00:00').getTime(),durationSeconds:0}];
+ globalThis.fetch=async()=>Response.json({choices:[{message:{tool_calls:[{id:'reschedule',type:'function',function:{name:'workbench',arguments:JSON.stringify({action:'update_task',query:'task',date:'2026-11-03',time:'16:00'})}}]}}]});
+ try{await a.chatWithAgent({url:'https://api.example/v1',key:'fake',model:'fake'},{messages:[],entries:[]},'把已完成的任务改到11月3日下午4点');assert.equal(f.state.tasks[0].scheduledDate,'2026-11-03');assert.equal(f.state.records.length,1)}finally{globalThis.fetch=original}
 });
 
 test('chat executes only allowed tools; private query results and API secrets never enter model messages',async()=>{

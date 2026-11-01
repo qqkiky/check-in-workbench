@@ -20,12 +20,14 @@ import { Icons } from './components/common/Icons'
 import { initAssistantSync } from './services/assistant'
 import { AgentScreen } from './screens/AgentScreen'
 import { listenForQuickChat } from './services/quickChat'
+import { useCompactLayout } from './utils/useCompactLayout'
+import './agenda.css'
 
 type Tab = 'home' | 'account' | 'timeline' | 'info' | 'more' | 'notes' | 'agent'
 
 // 底部主导航：Do(打卡) · 记账 · 回顾 · 资讯 · 更多（记账入口在「记账」Tab 内部，不再有中央 FAB）
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
-  { key: 'home', label: 'Do', icon: <Icons.Home size={20} /> },
+  { key: 'home', label: '今日', icon: <Icons.Home size={20} /> },
   { key: 'account', label: '记账', icon: <Icons.Wallet size={20} /> },
   { key: 'timeline', label: '回顾', icon: <Icons.BarChart size={20} /> },
   { key: 'info', label: '资讯', icon: <Icons.Newspaper size={20} /> },
@@ -42,6 +44,7 @@ export default function App() {
   const [listOpen, setListOpen] = useState(false)
   const [animateKey, setAnimateKey] = useState(0)
   const [quickChatRequest, setQuickChatRequest] = useState(0)
+  const compact = useCompactLayout()
 
   useReminderScheduler()
   const openNotes = () => setTab('notes')
@@ -107,6 +110,7 @@ export default function App() {
 
   const switchTab = (t: Tab) => {
     if (settings.hapticsEnabled) haptic('light')
+    if (t === 'agent') setQuickChatRequest(value => value + 1)
     setTab(t)
   }
 
@@ -117,7 +121,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-full w-full max-w-md mx-auto bg-[#F2F2F7] relative flex flex-col overflow-hidden">
+    <div className={`workbench-shell h-full w-full max-w-md mx-auto bg-[#F6F7FA] relative flex flex-col overflow-hidden ${compact ? 'is-compact' : ''}`}>
       <div className="flex-1 overflow-hidden relative">
         {detailTaskId ? (
           <div key="detail" className="absolute inset-0 animate-fade-in">
@@ -135,26 +139,26 @@ export default function App() {
           </div>
         ) : (
           <div key={animateKey} className="absolute inset-0 animate-fade-in">
-            {tab === 'home' && <HomeScreen />}
+            {tab === 'home' && <HomeScreen compact={compact} onOpenAgent={Capacitor.isNativePlatform() ? () => switchTab('agent') : undefined} />}
             {tab === 'agent' && <AgentScreen quickChatRequest={quickChatRequest} />}
             {tab === 'account' && <AccountingScreen />}
             {tab === 'timeline' && <TimelineReviewScreen />}
             {tab === 'info' && <InfoScreen />}
-            {tab === 'more' && <MoreScreen onOpenNotes={openNotes} onOpenList={() => setListOpen(true)} />}
+            {tab === 'more' && <MoreScreen onOpenNotes={openNotes} onOpenList={() => setListOpen(true)} onNavigate={compact ? switchTab : undefined} />}
             {tab === 'notes' && <NotesScreen onBack={() => setTab('more')} />}
           </div>
         )}
       </div>
 
-      {/* 底部 Tab Bar（4 项） */}
+      {/* 外屏保留三个主入口，其余页面从更多进入。 */}
       {!detailTaskId && !listOpen && (
         <nav className="shrink-0 border-t border-gray-200 bg-white/95 backdrop-blur safe-area-pb relative">
           <div className="flex">
-            {(Capacitor.isNativePlatform() ? [TABS[0],{key:'agent' as const,label:'助手',icon:<Icons.Sparkles size={20}/>},...TABS.slice(1)] : TABS).map((t) => (
+            {(compact && Capacitor.isNativePlatform() ? [TABS[0],{key:'agent' as const,label:'说话',icon:<Icons.Mic size={20}/>},TABS[4]] : TABS).map((t) => (
               <button
                 key={t.key}
                 onClick={() => switchTab(t.key)}
-                className={`nav-button ${tab === t.key ? 'nav-button-active' : ''}`}
+                className={`nav-button ${tab === t.key ? 'nav-button-active' : ''} ${compact && t.key === 'agent' ? 'nav-voice' : ''}`}
               >
                 <span className="relative">
                   {t.icon}

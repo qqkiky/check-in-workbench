@@ -115,7 +115,7 @@ export function CheckInTimeModal({
 
         {isMakeup && (
           <div className="text-[11px] text-orange-500">
-            补卡模式：记录将记到所选日期（{date}），而非计划时间。
+            实际完成日期为 {date}；这条待办所属的日期保持不变。
           </div>
         )}
         {isFuture && (

@@ -47,7 +47,7 @@
     font-family: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', -apple-system,
       BlinkMacSystemFont, 'Noto Sans CJK SC', 'Source Han Sans SC', Helvetica,
       Arial, sans-serif;
-    font-weight: 600;
+    font-weight: 400;
     background: var(--bg-primary);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;

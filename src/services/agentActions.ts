@@ -6,17 +6,18 @@ import { accountBalance, formatMoney } from '@/utils/accounting'
 import { syncTasksToCalendar, isCalendarSyncEnabled } from '@/capacitor/task-calendar'
 import type { Task, Transaction, Account } from '@/types'
 
-export const AGENT_ACTIONS = ['list_tasks','add_task','update_task','complete_task','reopen_task','delete_task','list_transactions','add_transaction','update_transaction','delete_transaction','list_accounts','add_account','update_account','delete_account','list_notes','add_note','update_note','delete_note','add_transfer'] as const
+export const AGENT_ACTIONS = ['list_tasks','add_task','update_task','complete_task','update_completion_time','reopen_task','delete_task','list_transactions','add_transaction','update_transaction','delete_transaction','list_accounts','add_account','update_account','delete_account','list_notes','add_note','update_note','delete_note','add_transfer'] as const
 export interface AgentArgs {
   action: typeof AGENT_ACTIONS[number]
   query?: string; title?: string; content?: string; date?: string; time?: string
+  completedDate?: string; completedTime?: string
   targetDate?: string; startDate?: string; endDate?: string; duration?: number; recurrence?: string; weekdays?: number[]; monthDay?: number
   type?: string; amountCents?: number; account?: string; category?: string; note?: string
   name?: string; accountType?: string; initialBalanceCents?: number; fromAccount?: string; toAccount?: string; feeCents?: number
 }
 export interface PendingAgentAction { args: AgentArgs; guard: string; label: string }
 export interface AgentResult { text: string; modelStatus: string; pending?: PendingAgentAction; callId?: string }
-const fields = ['action','query','title','content','date','time','targetDate','startDate','endDate','duration','recurrence','weekdays','monthDay','type','amountCents','account','category','note','name','accountType','initialBalanceCents','fromAccount','toAccount','feeCents']
+const fields = ['action','query','title','content','date','time','completedDate','completedTime','targetDate','startDate','endDate','duration','recurrence','weekdays','monthDay','type','amountCents','account','category','note','name','accountType','initialBalanceCents','fromAccount','toAccount','feeCents']
 function text(value: unknown, label: string, max=200): string {
   if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error(`请明确${label}`)
   return value.trim()
@@ -81,12 +82,25 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
     if(recurrence==='monthly'&&(!Number.isInteger(patch.monthDay)||patch.monthDay!<1||patch.monthDay!>31))throw new Error('请明确每月几号')
     label=`${patch.scheduledDate||'未指定单次日期'} ${patch.scheduledTime||''} ${patch.title}`;calendar=true
     run=current?()=>s.updateTask(current.id,patch):()=>s.addTask({...patch,categoryId:'work',reminderEnabled:true,reminderLead:0} as Omit<Task,'id'|'createdAt'|'updatedAt'>)
-  } else if(args.action==='complete_task'||args.action==='reopen_task') {
-    const task=selectTask(), day=args.date?date(args.date):task.recurrence==='none'?task.scheduledDate:today
+  } else if(args.action==='complete_task'||args.action==='update_completion_time'||args.action==='reopen_task') {
+    if(args.action==='reopen_task'&&(args.time||args.completedTime||args.completedDate))throw new Error('修改完成时间请使用 update_completion_time；本次保留已完成状态')
+    const task=selectTask(), taskRecords=s.records.filter(item=>item.taskId===task.id)
+    const day=args.date?date(args.date):args.targetDate?date(args.targetDate):task.recurrence==='none'?(taskRecords[0]?.date||task.scheduledDate||today):today
     if(!day)throw new Error('请明确完成日期')
-    const record=s.records.find(item=>item.taskId===task.id&&item.date===day)
+    const record=taskRecords.find(item=>item.date===day)
     label=`${day} ${task.title}`;calendar=true
-    run=()=>{if(args.action==='reopen_task'){if(record)s.deleteRecord(record.id)}else if(!record)s.addRecord({taskId:task.id,taskTitle:task.title,categoryId:task.categoryId,date:day,completedAt:Date.now(),durationSeconds:0})}
+    if(args.action==='reopen_task')run=()=>{if(record)s.deleteRecord(record.id)}
+    else {
+      if(args.action==='update_completion_time'&&!record)throw new Error('没有找到这一天的完成记录，请明确要修改的任务和日期')
+      const completionTime=args.completedTime??args.time
+      if((args.action==='update_completion_time'||args.completedDate)&&!completionTime)throw new Error('请明确实际完成时间，格式为 HH:mm')
+      const completionDay=args.completedDate?date(args.completedDate):record?fmtDate(new Date(record.completedAt)):today
+      const completedAt=completionTime?new Date(`${completionDay}T${time(completionTime)}:00`).getTime():record?.completedAt??Date.now()
+      if(completedAt>Date.now()+60000)throw new Error('完成时间不能晚于现在，请核对实际完成日期和时间')
+      if(record?.startedAt!==undefined&&completedAt<record.startedAt)throw new Error('完成时间早于开始时间，请先核对开始时间；本次保留原记录')
+      if(completionTime)label+=`；完成时间 ${completionDay} ${completionTime}`
+      run=record?()=>{if(completionTime)s.updateRecord(record.id,{completedAt,durationSeconds:record.startedAt!==undefined?Math.round((completedAt-record.startedAt)/1000):record.durationSeconds})}:()=>s.addRecord({taskId:task.id,taskTitle:task.title,categoryId:task.categoryId,date:day,completedAt,durationSeconds:0})
+    }
   } else if(args.action==='delete_task') {
     const task=selectTask();label=task.title;guard=JSON.stringify(task);calendar=true;run=()=>s.deleteTask(task.id)
   } else if(args.action==='list_transactions') {
