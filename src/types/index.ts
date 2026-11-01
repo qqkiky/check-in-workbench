@@ -38,6 +38,7 @@ export interface Task {
   recurrence: Recurrence  // 重复方式：不重复 / 每日 / 每周 / 每月
   weekdays?: number[]     // 每周重复日 [0-6]，recurrence==='weekly' 时生效
   monthDay?: number       // 每月几号重复，recurrence==='monthly' 时生效（1-31）
+  excludedDates?: string[] // 仅取消指定日期的重复实例，保留后续习惯
   priority?: 'low' | 'normal' | 'high'
 
   // 提醒

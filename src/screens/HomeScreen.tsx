@@ -15,6 +15,7 @@ import { APP_NAME } from '@/types'
 import { APP_VERSION } from '@/version'
 import { TodayAgenda } from '@/components/tasks/TodayAgenda'
 import { buildTodayAgenda } from '@/services/todayAgenda'
+import { taskOccursOnDate } from '@/utils/recurrence'
 
 type DayTab = 'today' | 'week' | 'quick'
 
@@ -100,18 +101,18 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
       if (t.archivedAt || t.isQuick) continue
       if (t.recurrence === 'weekly' && t.weekdays && t.weekdays.length) {
         for (const d of weekDates) {
-          if (t.weekdays.includes(d.getDay())) out.push({ task: t, dateKey: fmtDate(d) })
+          if (taskOccursOnDate(t,d)) out.push({ task: t, dateKey: fmtDate(d) })
         }
         continue
       }
       if (t.recurrence === 'monthly' && t.monthDay) {
         for (const d of weekDates) {
-          if (d.getDate() === t.monthDay) out.push({ task: t, dateKey: fmtDate(d) })
+          if (taskOccursOnDate(t,d)) out.push({ task: t, dateKey: fmtDate(d) })
         }
         continue
       }
       if (t.recurrence === 'daily') {
-        for (const d of weekDates) out.push({ task: t, dateKey: fmtDate(d) })
+        for (const d of weekDates) if(taskOccursOnDate(t,d)) out.push({ task: t, dateKey: fmtDate(d) })
         continue
       }
       // 不重复（一次性）

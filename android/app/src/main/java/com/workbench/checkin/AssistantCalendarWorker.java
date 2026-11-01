@@ -70,6 +70,10 @@ public class AssistantCalendarWorker extends Worker {
                     }
                     if(!id.matches("[A-Za-z0-9_-]{1,100}")||!date.matches("\\d{4}-\\d{2}-\\d{2}")||!time.matches("([01]\\d|2[0-3]):[0-5]\\d"))continue;
                     if(!status.equals("pending")&&!status.equals("completed")&&!status.equals("cancelled"))continue;
+                    if(metadata==null&&!status.equals("cancelled")){
+                        boolean localKnown=false;for(int j=0;j<localTasks.length();j++)if(id.equals(localTasks.getJSONObject(j).optString("id")))localKnown=true;
+                        if(!localKnown)calendar.markCloudOnly(id);
+                    }
                     String currentKey=id+"@"+date;
                     for(String key:context.getSharedPreferences("calendar-events",0).getAll().keySet()){
                         if(key.startsWith(id+"@")&&(!key.equals(currentKey)||status.equals("cancelled")))calendar.deleteEvent(key);

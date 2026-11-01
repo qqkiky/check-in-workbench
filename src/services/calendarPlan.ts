@@ -25,7 +25,7 @@ export function buildCalendarEvents(task: Task, records: CheckInRecord[], now = 
     const cutoff = new Date(now.getFullYear(),now.getMonth(),now.getDate()-30).getTime()
     for (const record of records) if (record.taskId === task.id && new Date(`${record.date}T00:00:00`).getTime() >= cutoff) dates.add(record.date)
   }
-  return [...dates].map(date => {
+  return [...dates].filter(date=>!task.excludedDates?.includes(date)).map(date => {
     const [year, month, day] = date.split('-').map(Number)
     const [hour, minute] = task.scheduledTime!.split(':').map(Number)
     const start = new Date(year, month - 1, day, hour, minute).getTime()

@@ -10,8 +10,9 @@
 import { Capacitor } from '@capacitor/core'
 import { registerPlugin } from '@capacitor/core'
 import type { Task, CheckInRecord } from '@/types'
-import { appStorage } from '@/services/appStorage'
+import { appStorage, flushPrivateStorage } from '@/services/appStorage'
 import { buildCalendarEvents } from '@/services/calendarPlan'
+import { useStore } from '@/store'
 
 interface TaskCalendarPlugin {
   syncTask(opts: {
@@ -24,6 +25,7 @@ interface TaskCalendarPlugin {
   }): Promise<{ ok: boolean; eventId: number }>
   syncAll(opts: { tasks: any[] }): Promise<{ ok: boolean; synced: number }>
   removeTask(opts: { taskId: string }): Promise<{ ok: boolean; removed: number }>
+  reconcile(opts:{fullSnapshot:boolean;activeTaskIds:string[]}):Promise<{removed:number;deletedKeys:string[]}>
   checkPermissions(): Promise<{ calendar: string }>
   requestPermissions(): Promise<{ calendar: string }>
 }
@@ -31,6 +33,13 @@ interface TaskCalendarPlugin {
 const TaskCalendar = registerPlugin<TaskCalendarPlugin>('TaskCalendar')
 const isNative = Capacitor.getPlatform() !== 'web'
 const ENABLED_KEY = 'wb.calendar.enabled.v1'
+export interface CalendarSyncReport { synced:number;removed:number;deletedTasks:number;cancelledOccurrences:number }
+let queue:Promise<unknown>=Promise.resolve()
+function serial<T>(run:()=>Promise<T>):Promise<T> {
+  const result=queue.catch(()=>{}).then(run)
+  queue=result.catch(()=>{})
+  return result
+}
 export function isCalendarSyncEnabled() { return appStorage.getItem(ENABLED_KEY) === '1' }
 export async function enableCalendarSync() {
   if (!await ensureCalendarPermission()) return false
@@ -68,7 +77,7 @@ export async function ensureCalendarPermission(): Promise<boolean> {
 export async function syncTaskToCalendar(task: Task, records: CheckInRecord[] = []): Promise<void> {
   if (!isNative) return
   try {
-    await syncTasksToCalendar([task], records)
+    await performSync(new Set([task.id]),false)
   } catch (e) {
     window.dispatchEvent(new Event('calendar-sync-error'))
   }
@@ -78,21 +87,36 @@ export async function syncTaskToCalendar(task: Task, records: CheckInRecord[] = 
 export async function removeTaskFromCalendar(taskId: string): Promise<void> {
   if (!isNative || !isCalendarSyncEnabled()) return
   try {
-    await TaskCalendar.removeTask({ taskId })
+    await serial(async()=>{await flushPrivateStorage();await TaskCalendar.removeTask({ taskId })})
   } catch (e) {
     console.warn('[task-calendar] removeTask failed', e)
   }
 }
 
 /** 批量把一组待办同步到系统日历（用于「全量/今日同步」入口） */
-export async function syncTasksToCalendar(tasks: Task[], records: CheckInRecord[] = []): Promise<number> {
-  if (!isNative || !isCalendarSyncEnabled()) return 0
-  if ((await TaskCalendar.checkPermissions()).calendar !== 'granted') throw new Error('请重新授予日历权限')
-  for (const task of tasks.filter(task => task.archivedAt || !task.scheduledTime)) {
-    await TaskCalendar.removeTask({ taskId: task.id })
-  }
-  const list = tasks.flatMap(task => buildCalendarEvents(task, records))
-  if (!list.length) return 0
-  const result = await TaskCalendar.syncAll({ tasks: list })
-  return result.synced
+export async function syncTasksToCalendar(_tasks: Task[], _records: CheckInRecord[] = []): Promise<number> {
+  return (await syncCalendarWithCleanup()).synced
+}
+
+export function syncCalendarWithCleanup():Promise<CalendarSyncReport> { return performSync(null,true) }
+
+function performSync(requested:Set<string>|null,fullSnapshot:boolean):Promise<CalendarSyncReport> {
+  return serial(async()=>{
+    const report={synced:0,removed:0,deletedTasks:0,cancelledOccurrences:0}
+    if(!isNative||!isCalendarSyncEnabled())return report
+    if(!useStore.getState().initialized)throw new Error('本机数据尚未加载，未处理日历删除')
+    await flushPrivateStorage()
+    if((await TaskCalendar.checkPermissions()).calendar!=='granted')throw new Error('请重新授予日历权限')
+    const state=useStore.getState()
+    const result=await TaskCalendar.reconcile({fullSnapshot,activeTaskIds:state.tasks.filter(task=>!task.archivedAt&&task.scheduledTime).map(task=>task.id)})
+    if(!Array.isArray(result.deletedKeys)||result.deletedKeys.some(key=>typeof key!=='string'))throw new Error('日历删除核对结果无效，未改变本机任务')
+    report.removed=result.removed
+    Object.assign(report,useStore.getState().applyCalendarDeletions(result.deletedKeys))
+    await flushPrivateStorage()
+    const latest=useStore.getState(),tasks=requested?latest.tasks.filter(task=>requested.has(task.id)):latest.tasks
+    for(const task of tasks.filter(task=>task.archivedAt||!task.scheduledTime))await TaskCalendar.removeTask({taskId:task.id})
+    const events=tasks.flatMap(task=>buildCalendarEvents(task,latest.records))
+    if(events.length)report.synced=(await TaskCalendar.syncAll({tasks:events})).synced
+    return report
+  })
 }

@@ -83,11 +83,19 @@ export default function App() {
 
   // 启动后把现有「开启提醒」的待办同步到系统日历（原生平台生效，Web 端 no-op）
   useEffect(() => {
-    const t = setTimeout(() => {
+    let timer:ReturnType<typeof setTimeout>
+    const sync=()=>{
+      clearTimeout(timer)
+      timer=setTimeout(()=>{
       const state = useStore.getState()
       void syncTasksToCalendar(state.tasks, state.records).catch(() => {})
-    }, 800)
-    return () => clearTimeout(t)
+      },400)
+    }
+    const visible=()=>{if(document.visibilityState==='visible')sync()}
+    sync()
+    document.addEventListener('visibilitychange',visible)
+    window.addEventListener('focus',sync)
+    return () => {clearTimeout(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',sync)}
   }, [])
 
   useEffect(() => {

@@ -12,7 +12,7 @@ import { CategoryIcon } from '@/utils/iconLibrary'
 import { CategoryFormModal } from '@/components/tasks/CategoryFormModal'
 import { onInstallable, isInstallable, installApp, isIOS, isStandalone, getInstallPlatform, isInAppBrowser, isMiuiBrowser } from '@/utils/pwa'
 import { requestNotificationPermission } from '@/utils/reminder'
-import { syncTasksToCalendar, isCalendarAvailable, enableCalendarSync } from '@/capacitor/task-calendar'
+import { syncCalendarWithCleanup, isCalendarAvailable, enableCalendarSync } from '@/capacitor/task-calendar'
 import { APP_NAME } from '@/types'
 import { THEME_PRESETS } from '@/utils/theme'
 import { AssistantSettings } from '@/components/AssistantSettings'
@@ -315,8 +315,8 @@ export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNote
               }
               try {
                 if (!await enableCalendarSync()) { showToast('未授予日历权限，尚未同步'); return }
-                const count = await syncTasksToCalendar(tasks, records)
-                showToast(`已同步 ${count} 项日程到系统日历 📅`)
+                const result = await syncCalendarWithCleanup()
+                showToast(`已同步 ${result.synced} 项，清理日历残留 ${result.removed} 项；期待中删除 ${result.deletedTasks} 项、取消习惯 ${result.cancelledOccurrences} 次`)
               } catch { showToast('日历同步失败，请检查权限后重试') }
             }}
             className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors"
@@ -325,7 +325,7 @@ export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNote
             <span className="flex-1">
               <span className="block text-sm font-medium text-gray-900">同步到系统日历</span>
               <span className="block text-[11px] text-gray-400">
-                写入专属日历；完成后标记 ✅ 并取消提醒
+                双向同步删除与清理残留；习惯仅取消当天
               </span>
             </span>
             <Icons.ChevronRight size={14} className="text-gray-300" />

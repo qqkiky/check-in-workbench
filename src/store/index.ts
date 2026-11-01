@@ -6,6 +6,7 @@ import { todayStr, friendlyDate, fmtDate, dt } from '@/utils/date'
 import { generateSeedData } from '@/utils/seed'
 import { taskOccursOnDate } from '@/utils/recurrence'
 import { syncTaskToCalendar, removeTaskFromCalendar } from '@/capacitor/task-calendar'
+import { planCalendarDeletions } from '@/services/calendarDeletion'
 
 interface StoreState {
   tasks: Task[]
@@ -27,6 +28,7 @@ interface StoreState {
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateTask: (id: string, patch: Partial<Task>) => void
   deleteTask: (id: string) => void
+  applyCalendarDeletions: (keys:string[]) => { deletedTasks:number; cancelledOccurrences:number }
   archiveTask: (id: string) => void
   restoreTask: (id: string) => void
   reorderTasks: (ids: string[]) => void
@@ -192,6 +194,16 @@ export const useStore = create<StoreState>((set, get) => ({
     storage.setTasks(next)
     set({ tasks: next })
     void removeTaskFromCalendar(id)
+  },
+
+  applyCalendarDeletions(keys) {
+    const plan = planCalendarDeletions(get().tasks, keys)
+    if (plan.changed) {
+      storage.setTasks(plan.tasks)
+      set({ tasks: plan.tasks })
+      for (const id of plan.removedIds) void removeTaskFromCalendar(id)
+    }
+    return { deletedTasks: plan.removedIds.length, cancelledOccurrences: plan.cancelledOccurrences }
   },
 
   archiveTask(id) {
@@ -417,6 +429,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   reset() {
+    const removedTaskIds=get().tasks.map(task=>task.id)
     // 真正清空：任务与记录置空，分类恢复默认，保持已初始化标记避免重新播种示例数据
     storage.setTasks([])
     storage.setRecords([])
@@ -440,6 +453,7 @@ export const useStore = create<StoreState>((set, get) => ({
       transfers: [],
       initialized: true,
     })
+    for(const id of removedTaskIds)void removeTaskFromCalendar(id)
   },
 
   restoreSnapshot(data) {
@@ -500,6 +514,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const today = fmtDate(now)
     const tasks = get().tasks.filter((t) => !t.archivedAt)
     return tasks.filter((t) => {
+      if(t.excludedDates?.includes(today))return false
       const todayRec = get().records.find(
         (r) => r.taskId === t.id && r.date === today
       )

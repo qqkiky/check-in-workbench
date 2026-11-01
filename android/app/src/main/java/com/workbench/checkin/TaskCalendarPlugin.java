@@ -24,6 +24,8 @@ import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONObject;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * TaskCalendar —— 把工作台待办写入系统日历并设置提醒。
@@ -31,8 +33,8 @@ import org.json.JSONObject;
  * 设计要点：
  * - 通过 CalendarContract 写入/更新/删除系统日历事件；提醒由系统日历进程负责，
  *   主应用被杀后到点仍会弹提醒（MIUI 日历原生支持）。
- * - 用 Events.SYNC_DATA1 存入 "checkin:<taskId>" 作为幂等标识，便于更新/删除时定位。
- * - 优先复用设备上「可写」日历；若无则创建一个本地日历（ACCOUNT_TYPE_LOCAL）。
+ * - 保存任务实例与事件编号的对应关系；记录外部删除，避免下一次同步重新创建。
+ * - 只使用应用专属的本地日历，不选择其他个人或工作日历。
  * - IO 操作在后台线程执行，避免阻塞 UI / 触发严格模式。
  */
 @CapacitorPlugin(
@@ -122,6 +124,7 @@ public class TaskCalendarPlugin extends Plugin {
                     int lead = t.optInt("reminderLeadMin", 0);
                     String desc = t.optString("description", "");
                     long eventId = upsertEvent(taskId, title, start, end, lead, desc, t.optBoolean("completed", false), t.optBoolean("reminderEnabled", true));
+                    if(eventId<=0)continue;
                     com.getcapacitor.JSObject r = new com.getcapacitor.JSObject();
                     r.put("taskId", taskId);
                     r.put("eventId", eventId);
@@ -155,7 +158,10 @@ public class TaskCalendarPlugin extends Plugin {
         runIO(() -> {
             try {
                 int removed = 0;
-                for (String key : getContext().getSharedPreferences("calendar-events", 0).getAll().keySet()) {
+                synchronized(CalendarRepository.class){new CalendarRepository(getContext()).blockTask(taskId);}
+                Set<String> keys=new HashSet<>(getContext().getSharedPreferences("calendar-events",0).getAll().keySet());
+                keys.addAll(getContext().getSharedPreferences("calendar-deletions",0).getAll().keySet());
+                for (String key : keys) {
                     if (key.equals(taskId) || key.startsWith(taskId + "@")) removed += deleteEvent(key);
                 }
                 JSObject res = new JSObject();
@@ -181,7 +187,8 @@ public class TaskCalendarPlugin extends Plugin {
     private long upsertEvent(String taskId, String title, long startMillis, long endMillis,
             int lead, String description, boolean completed, boolean reminderEnabled) throws Exception {
         synchronized (CalendarRepository.class) {
-            return new CalendarRepository(getContext()).upsertEvent(taskId, title, startMillis, endMillis, lead, description, completed, reminderEnabled);
+            CalendarRepository repository=new CalendarRepository(getContext());repository.allowTask(taskId);
+            return repository.upsertEvent(taskId, title, startMillis, endMillis, lead, description, completed, reminderEnabled);
         }
     }
     private int deleteEvent(String taskId) throws Exception {
@@ -189,4 +196,23 @@ public class TaskCalendarPlugin extends Plugin {
             return new CalendarRepository(getContext()).deleteEvent(taskId);
         }
     }
+    /** Read only this APK's known event mappings; an empty full task list is meaningful. */
+    @PluginMethod
+    public void reconcile(PluginCall call) {
+        if(!PermissionState.GRANTED.equals(getPermissionState("calendar"))){call.reject("日历权限未授予");return;}
+        final boolean full=Boolean.TRUE.equals(call.getBoolean("fullSnapshot",false));
+        final com.getcapacitor.JSArray ids=call.getArray("activeTaskIds");
+        if(full&&ids==null){call.reject("完整同步缺少任务列表，未清理日历");return;}
+        runIO(()->{
+            try {
+                synchronized(CalendarRepository.class){
+                    CalendarRepository repository=new CalendarRepository(getContext());
+                    int removed=0;
+                    if(full){Set<String> active=new HashSet<>();for(int i=0;i<ids.length();i++)active.add(ids.getString(i));removed=repository.pruneTasks(active);}
+                    JSObject result=new JSObject();result.put("removed",removed);result.put("deletedKeys",repository.collectDeletions());call.resolve(result);
+                }
+            }catch(Exception error){call.reject("日历删除核对失败："+error.getMessage());}
+        });
+    }
+
 }

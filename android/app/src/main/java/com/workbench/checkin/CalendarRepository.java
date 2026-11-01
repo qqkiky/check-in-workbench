@@ -9,6 +9,9 @@ import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
 import android.provider.CalendarContract.Reminders;
 import java.util.TimeZone;
+import java.util.Set;
+import java.util.HashSet;
+import org.json.JSONArray;
 
 /** Shared by foreground UI and background sync; all callers hold its class lock. */
 public final class CalendarRepository {
@@ -22,6 +25,7 @@ public final class CalendarRepository {
         String sel = Calendars.ACCOUNT_NAME + "=? AND " + Calendars.ACCOUNT_TYPE + "=? AND " + Calendars.NAME + "=?";
         Cursor c = cr.query(Calendars.CONTENT_URI, proj, sel,
                 new String[]{"打卡工作台", CalendarContract.ACCOUNT_TYPE_LOCAL, "checkin"}, Calendars._ID + " ASC");
+        if(c==null)throw new Exception("无法读取期待日历，尚未创建或清理日程");
         if (c != null) {
             try {
                 if (c.moveToFirst()) {
@@ -32,6 +36,50 @@ public final class CalendarRepository {
             }
         }
         return createLocalCalendar();
+    }
+
+    public static String parentTaskId(String key) {
+        return key.matches(".+@\\d{4}-\\d{2}-\\d{2}")?key.substring(0,key.length()-11):key;
+    }
+    private Set<Long> ownedCalendarIds() throws Exception {
+        Set<Long> ids=new HashSet<>();
+        Cursor cursor=context.getContentResolver().query(Calendars.CONTENT_URI,new String[]{Calendars._ID},
+            Calendars.ACCOUNT_NAME+"=? AND "+Calendars.ACCOUNT_TYPE+"=? AND "+Calendars.NAME+"=?",
+            new String[]{"打卡工作台",CalendarContract.ACCOUNT_TYPE_LOCAL,"checkin"},null);
+        if(cursor==null)throw new Exception("无法读取期待日历，尚未处理删除");
+        try{while(cursor.moveToNext())ids.add(cursor.getLong(0));}finally{cursor.close();}
+        return ids;
+    }
+    public void blockTask(String id) {
+        context.getSharedPreferences("calendar-removed-tasks",0).edit().putBoolean(id,true).apply();
+    }
+    public void allowTask(String key) {
+        String id=parentTaskId(key);
+        context.getSharedPreferences("calendar-removed-tasks",0).edit().remove(id).apply();
+        context.getSharedPreferences("calendar-cloud-only",0).edit().remove(id).apply();
+    }
+    public void markCloudOnly(String id) {
+        context.getSharedPreferences("calendar-cloud-only",0).edit().putBoolean(id,true).apply();
+    }
+    /** Full snapshots may remove orphans. Partial updates must never prune other tasks. */
+    public int pruneTasks(Set<String> activeIds) throws Exception {
+        for(String id:activeIds)context.getSharedPreferences("calendar-cloud-only",0).edit().remove(id).apply();
+        int removed=0;
+        Set<String> keys=new HashSet<>(context.getSharedPreferences("calendar-events",0).getAll().keySet());
+        keys.addAll(context.getSharedPreferences("calendar-deletions",0).getAll().keySet());
+        for(String key:keys) {
+            String id=parentTaskId(key);
+            if(!activeIds.contains(id)&&!context.getSharedPreferences("calendar-cloud-only",0).getBoolean(id,false))removed+=deleteEvent(key);
+        }
+        return removed;
+    }
+    public JSONArray collectDeletions() throws Exception {
+        Set<String> keys=new HashSet<>(context.getSharedPreferences("calendar-events",0).getAll().keySet());
+        if(!keys.isEmpty()&&ownedCalendarIds().isEmpty())throw new Exception("期待的专属日历不存在，无法确认日程删除；本机任务保持不变");
+        for(String key:keys)if(findEventId(key)==0)context.getSharedPreferences("calendar-deletions",0).edit().putBoolean(key,true).apply();
+        JSONArray result=new JSONArray();
+        for(String key:context.getSharedPreferences("calendar-deletions",0).getAll().keySet())result.put(key);
+        return result;
     }
 
     /** 创建一个本地日历（无需真实账号，MIUI/安卓均支持 LOCAL 类型） */
@@ -58,34 +106,43 @@ public final class CalendarRepository {
     }
 
     /** 按 taskId 查询已有事件 _ID（无则 -1） */
-    private long findEventId(String taskId) {
+    private long findEventId(String taskId) throws Exception {
         ContentResolver cr = context.getContentResolver();
         long knownId = context.getSharedPreferences("calendar-events", 0).getLong(taskId, -1);
         if (knownId <= 0) return -1;
         Cursor c = cr.query(
                 Events.CONTENT_URI,
-                new String[]{ Events._ID },
+                new String[]{ Events._ID, Events.CALENDAR_ID, Events.DELETED },
                 Events._ID + "=?",
                 new String[]{ String.valueOf(knownId) },
                 null);
         if (c != null) {
             try {
                 if (c.moveToFirst()) {
+                    if(!ownedCalendarIds().contains(c.getLong(c.getColumnIndexOrThrow(Events.CALENDAR_ID))))return -2;
+                    if(c.getInt(c.getColumnIndexOrThrow(Events.DELETED))!=0)return 0;
                     return c.getLong(c.getColumnIndexOrThrow(Events._ID));
                 }
             } finally {
                 c.close();
             }
-        }
-        return -1;
+        } else throw new Exception("无法核实已同步日程，尚未处理删除");
+        return 0;
     }
 
     /** 插入或更新一条事件 + 提醒，返回事件 _ID */
     public long upsertEvent(String taskId, String title, long startMillis, long endMillis,
                              int reminderLeadMin, String description, boolean completed, boolean reminderEnabled) throws Exception {
         ContentResolver cr = context.getContentResolver();
-        long calId = getWritableCalendarId();
+        if(context.getSharedPreferences("calendar-removed-tasks",0).getBoolean(parentTaskId(taskId),false)
+            ||context.getSharedPreferences("calendar-deletions",0).getBoolean(taskId,false))return 0;
         long existing = findEventId(taskId);
+        if(existing==0){
+            if(ownedCalendarIds().isEmpty())throw new Exception("期待的专属日历不存在，尚未重建日程");
+            context.getSharedPreferences("calendar-deletions",0).edit().putBoolean(taskId,true).apply();
+            return 0;
+        }
+        long calId = getWritableCalendarId();
 
         ContentValues ev = new ContentValues();
         ev.put(Events.CALENDAR_ID, calId);
@@ -124,9 +181,13 @@ public final class CalendarRepository {
     public int deleteEvent(String taskId) throws Exception {
         ContentResolver cr = context.getContentResolver();
         long eventId = findEventId(taskId);
-        if (eventId <= 0) return 0;
-        int n = cr.delete(Events.CONTENT_URI, Events._ID + "=?", new String[]{ String.valueOf(eventId) });
+        int n=0;
+        if(eventId>0){
+            cr.delete(Reminders.CONTENT_URI,Reminders.EVENT_ID+"=?",new String[]{String.valueOf(eventId)});
+            n=cr.delete(Events.CONTENT_URI,Events._ID+"=?",new String[]{String.valueOf(eventId)});
+        }
         context.getSharedPreferences("calendar-events", 0).edit().remove(taskId).apply();
+        context.getSharedPreferences("calendar-deletions",0).edit().remove(taskId).apply();
         return n;
     }
 }
