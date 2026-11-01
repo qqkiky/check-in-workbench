@@ -44,7 +44,14 @@ npx wrangler deploy
   本地操作覆盖日程的增改查、完成恢复和删除；记账的增改查删；账户的增改查删；笔记的增改查删和账户间转账。
   金额、账户和日期须通过本地校验；模糊多项时追问；删除必须点击本机确认，已有账目的账户不允许由助手删除。
   日程操作写入本机后尝试立即更新系统日历，权限不足会明确显示，不能保证模型或网络每次几秒响应。
-  此入口需要 APK 打开；不等于微信锁屏秒级同步。语音可通过系统输入法转写。
+  此入口需要 APK 打开；不等于微信锁屏秒级同步。输入区可切到“语音”，按住说话、松开后自动转写并发给 AI，
+  上滑或离开页面会取消；单次最长60秒。首次允许麦克风后需重新按住。只使用系统识别的最终结果，不发送失败或取消的语音。
+  系统语音服务可能联网，需设备提供可用的中文识别服务；应用不保存原始音频，也不把音频发给聊天 API。
+  语音转写后走相同的本机校验、待办保存和日历同步流程，信息不全或多项匹配时继续追问。
+  外屏加入 Android 小封面屏声明、小米连续性与贴边显示声明；左右安全区域避开侧边摄像头。
+  更新后在系统“设置 → 外屏 → 应用管理”检查是否可添加，是否列出仍由设备系统策略决定，不能仅凭模拟窗口测试保证。
+  适配依据：[Android 语音识别](https://developer.android.com/reference/android/speech/SpeechRecognizer)、
+  [小米 Flip 适配](https://dev.mi.com/xiaomihyperos/documentation/detail?pId=2026)。
   实现依据：[OpenAI 工具调用](https://developers.openai.com/api/docs/guides/function-calling)、
   [DeepSeek 工具调用](https://api-docs.deepseek.com/guides/tool_calls/)、
   [火山方舟兼容接口](https://console.volcengine.com/ark/region:cn-beijing/docs/compatible-with-openai-sdk)。

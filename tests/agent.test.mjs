@@ -20,7 +20,7 @@ async function load(){
   '@/capacitor/task-calendar':`export const isCalendarSyncEnabled=()=>globalThis.agentTest.enabled;export const syncTasksToCalendar=async()=>{globalThis.agentTest.calendar++;if(globalThis.agentTest.calendarError)throw Error('permission')};`,
   '@capacitor/core':`export const Capacitor={getPlatform:()=>globalThis.agentTest.platform};export const registerPlugin=()=>({request:options=>globalThis.agentTest.nativeRequest(options)});`,
  };
- const bundle=await build({stdin:{contents:`export * from './src/services/agent.ts';export * from './src/services/agentActions.ts';export * from './src/services/privacy.ts';`,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'agent-test',setup(b){b.onResolve({filter:/.*/},a=>modules[a.path]?{path:a.path,namespace:'test'}:null);b.onLoad({filter:/.*/,namespace:'test'},a=>({contents:modules[a.path],loader:'js'}));}}]});
+ const bundle=await build({stdin:{contents:`export * from './src/services/agent.ts';export * from './src/services/agentActions.ts';export * from './src/services/privacy.ts';export * from './src/services/voice.ts';`,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'agent-test',setup(b){b.onResolve({filter:/.*/},a=>modules[a.path]?{path:a.path,namespace:'test'}:null);b.onLoad({filter:/.*/,namespace:'test'},a=>({contents:modules[a.path],loader:'js'}));}}]});
  return {fixture,service:await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'))};
 }
 
@@ -88,7 +88,9 @@ test('chat executes only allowed tools; private query results and API secrets ne
   globalThis.fetch=async()=>Response.json({choices:[{message:{tool_calls:[{id:'bad',type:'function',function:{name:'shell',arguments:'{}'}}]}}]});
   await assert.rejects(a.chatWithAgent(config,history,'测试'),/未执行/);
   globalThis.fetch=async()=>Response.json({choices:[{finish_reason:'length',message:{content:'partial'}}]});await assert.rejects(a.chatWithAgent(config,history,'测试'),/截断/);
-  globalThis.fetch=async()=>Response.json({choices:[{message:{content:'已添加任务'}}]});const noOp=await a.chatWithAgent(config,history,'测试');assert.match(noOp.entries.at(-1).text,/数据没有改变/);
+  for(const content of ['已添加任务','已安排明天5点的日程并已同步日历']){
+   globalThis.fetch=async()=>Response.json({choices:[{message:{content}}]});const noOp=await a.chatWithAgent(config,history,'测试');assert.match(noOp.entries.at(-1).text,/数据没有改变/);
+  }
  }finally{globalThis.fetch=original}
 });
 
@@ -115,5 +117,22 @@ test('connection validation explains each missing field before sending any API r
   await assert.rejects(a.testAgent({...config,model:' '}),/模型名/);
   assert.equal(requests,0);
   assert.deepEqual(a.validateAgentConfig({url:' https://api.example/v1/ ',key:' TEST_KEY ',model:' deepseek-flash '}),config);
+ }finally{globalThis.fetch=original}
+});
+
+test('released speech calls AI once and automatically saves its schedule and calendar update',async()=>{
+ const {fixture:f,service:a}=await load();const original=globalThis.fetch;let resolveSpeech,requests=0,complete;
+ const done=new Promise(resolve=>{complete=resolve});const capture=new Promise(resolve=>{resolveSpeech=resolve});
+ const config={url:'https://api.example/v1',key:'TEST_KEY',model:'test'};
+ globalThis.fetch=async(_url,options)=>{
+  requests++;assert.equal(JSON.parse(options.body).messages.at(-1).content,'明天下午五点整理资料');
+  return Response.json({choices:[{message:{tool_calls:[{id:'voice-call',type:'function',function:{name:'workbench',arguments:JSON.stringify({action:'add_task',title:'整理资料',date:'2026-11-02',time:'17:00'})}}]}}]});
+ };
+ const voice=new a.HoldToTalk({status:async()=>({available:true,granted:true}),start:()=>capture,stop:async()=>{resolveSpeech({text:'明天下午五点整理资料'})},cancel:async()=>{},requestMicrophone:async()=>({granted:true})},{phase(){},error:message=>complete({error:message}),text:async text=>{try{complete(await a.chatWithAgent(config,{messages:[],entries:[]},text))}catch(error){complete({error})}}});
+ try{
+  await voice.press();assert.equal(requests,0);assert.equal(f.state.tasks.length,0);
+  voice.release();const result=await done;assert.ok(!result.error);assert.equal(requests,1);
+  assert.equal(f.state.tasks.length,1);assert.equal(f.state.tasks[0].scheduledDate,'2026-11-02');assert.equal(f.state.tasks[0].scheduledTime,'17:00');assert.equal(f.calendar,1);
+  assert.match(result.entries.at(-1).results[0].text,/已同步系统日历/);
  }finally{globalThis.fetch=original}
 });

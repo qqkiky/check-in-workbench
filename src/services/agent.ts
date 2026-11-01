@@ -83,7 +83,7 @@ export async function chatWithAgent(config:AgentConfig,history:AgentHistory,inpu
       messages.push({role:'tool',tool_call_id:calls[i].id,content:JSON.stringify({status:result.modelStatus})})
     }
     const content=typeof message.content==='string'?message.content.trim():''
-    const reply=calls.length?'':/(已添加|已记录|已创建|已删除|已记账|已更新)/.test(content)?'这次没有收到可执行操作，本机数据没有改变。请补充具体事项。':content||'请补充你想做的事情。'
+    const reply=calls.length?'':/(已添加|已记录|已创建|已删除|已记账|已更新|已保存|已安排|已完成|已同步)/.test(content)?'这次没有收到可执行操作，本机数据没有改变。请补充具体事项。':content||'请补充你想做的事情。'
     entries.push({id:crypto.randomUUID(),role:'assistant',text:reply,results} as ChatEntry)
     const next={messages,entries};if(sameConnection())await saveAgentHistory(next);return next
   } finally{busy=false}
