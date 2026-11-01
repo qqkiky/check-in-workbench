@@ -1,0 +1,157 @@
+import { useStore } from '@/store'
+import { flushPrivateStorage } from './appStorage'
+import { fmtDate } from '@/utils/date'
+import { accountBalance, formatMoney } from '@/utils/accounting'
+import { syncTasksToCalendar, isCalendarSyncEnabled } from '@/capacitor/task-calendar'
+import type { Task, Transaction, Account } from '@/types'
+
+export const AGENT_ACTIONS = ['list_tasks','add_task','update_task','complete_task','reopen_task','delete_task','list_transactions','add_transaction','update_transaction','delete_transaction','list_accounts','add_account','update_account','delete_account','list_notes','add_note','update_note','delete_note','add_transfer'] as const
+export interface AgentArgs {
+  action: typeof AGENT_ACTIONS[number]
+  query?: string; title?: string; content?: string; date?: string; time?: string
+  targetDate?: string; startDate?: string; endDate?: string; duration?: number; recurrence?: string; weekdays?: number[]; monthDay?: number
+  type?: string; amountCents?: number; account?: string; category?: string; note?: string
+  name?: string; accountType?: string; initialBalanceCents?: number; fromAccount?: string; toAccount?: string; feeCents?: number
+}
+export interface PendingAgentAction { args: AgentArgs; guard: string; label: string }
+export interface AgentResult { text: string; modelStatus: string; pending?: PendingAgentAction; callId?: string }
+const fields = ['action','query','title','content','date','time','targetDate','startDate','endDate','duration','recurrence','weekdays','monthDay','type','amountCents','account','category','note','name','accountType','initialBalanceCents','fromAccount','toAccount','feeCents']
+function text(value: unknown, label: string, max=200): string {
+  if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error(`请明确${label}`)
+  return value.trim()
+}
+function date(value: unknown): string {
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value+'T00:00:00'))||fmtDate(new Date(value+'T00:00:00'))!==value)throw new Error('请明确有效日期')
+  return value
+}
+function time(value: unknown): string {
+  if(typeof value!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(value))throw new Error('请明确几点几分，以及上午或下午')
+  return value
+}
+function money(value: unknown, allowZero=false, negative=false): number {
+  if(typeof value!=='number'||!Number.isSafeInteger(value)||Math.abs(value)>1e12||(!negative&&value<0)||(!allowZero&&value===0))throw new Error('请明确金额，最多保留两位小数')
+  return value/100
+}
+function one<T extends {id:string}>(items:T[], query:unknown, label:(item:T)=>string, exact=false):T {
+  const q=text(query,'要操作的内容或名称')
+  const same=items.filter(item=>item.id===q||label(item)===q)
+  const matches=same.length?same:exact?[]:items.filter(item=>label(item).includes(q))
+  if(matches.length!==1)throw new Error(matches.length?'找到多条，请补充完整名称、日期或记录编号后再操作':'没有找到对应内容，请补充准确名称')
+  return matches[0]
+}
+function inRange(day:string,args:AgentArgs) { return (!args.startDate||day>=args.startDate)&&(!args.endDate||day<=args.endDate) }
+
+export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAction): Promise<AgentResult> {
+  if(!raw||typeof raw!=='object'||Array.isArray(raw)||Object.keys(raw).some(key=>!fields.includes(key))||!AGENT_ACTIONS.includes(raw.action))throw new Error('助手返回了不支持的操作，未执行')
+  const args=Object.fromEntries(Object.entries(raw).filter(([,value])=>value!==null&&value!==undefined)) as unknown as AgentArgs
+  for(const [key,value] of Object.entries(args))if(!['duration','monthDay','amountCents','initialBalanceCents','feeCents','weekdays'].includes(key)&&typeof value!=='string')throw new Error('助手返回的字段格式不正确，未执行')
+  if(args.weekdays!==undefined&&(!Array.isArray(args.weekdays)||args.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
+  if(args.note!==undefined&&args.note.length>1000)throw new Error('备注太长，请缩短后重试')
+  const s=useStore.getState(), today=fmtDate(new Date())
+  if(args.startDate)date(args.startDate);if(args.endDate)date(args.endDate)
+  if(args.date)date(args.date);if(args.targetDate)date(args.targetDate)
+  if(args.startDate&&args.endDate&&args.startDate>args.endDate)throw new Error('起止日期顺序不正确')
+  const account=(name:unknown)=>one(s.accounts,name,item=>item.name,true)
+  const accountName=(id:string)=>s.accounts.find(item=>item.id===id)?.name||'已移除账户'
+  const taskLabel=(item:Task)=>`${item.title}`
+  const taskList=s.tasks.filter(item=>!item.archivedAt)
+  const selectTask=()=>one(args.targetDate?taskList.filter(item=>item.recurrence!=='none'||item.scheduledDate===args.targetDate):taskList,args.query,taskLabel)
+  const txnLabel=(item:Transaction)=>`${fmtDate(new Date(item.datetime))} ${item.type==='income'?'收入':'支出'} ${formatMoney(item.amount)} ${accountName(item.accountId)} ${item.note||''}`
+  const txns=()=>s.transactions.filter(item=>inRange(fmtDate(new Date(item.datetime)),args)&&(!args.date||fmtDate(new Date(item.datetime))===date(args.date))&&(!args.type||item.type===args.type)&&(!args.account||item.accountId===account(args.account).id))
+  let run:(()=>void)|undefined, label='', guard='', calendar=false
+  if(args.action==='list_tasks') {
+    const rows=taskList.filter(item=>(!args.query||item.title.includes(args.query))&&(!args.date||(item.recurrence==='daily'||item.recurrence==='weekly'&&item.weekdays?.includes(new Date(date(args.date)+'T00:00:00').getDay())||item.recurrence==='monthly'&&item.monthDay===new Date(args.date+'T00:00:00').getDate()||item.recurrence==='none'&&item.scheduledDate===args.date)))
+    return {text:rows.length?rows.slice(0,50).map(item=>`${s.records.some(record=>record.taskId===item.id&&record.date===(args.date||item.scheduledDate||today))?'✅':'□'} ${args.date||item.scheduledDate||'重复任务'} ${item.scheduledTime||''} ${item.title}［${item.id}］`).join('\n'):'没有符合条件的待办',modelStatus:'查询已在本机完成，结果仅向用户显示'}
+  }
+  if(args.action==='add_task'||args.action==='update_task') {
+    const current=args.action==='update_task'?selectTask():null
+    const recurrence=args.recurrence??current?.recurrence??'none'
+    if(!['none','daily','weekly','monthly'].includes(recurrence))throw new Error('重复方式不正确')
+    const patch:Partial<Task>={title:args.title!==undefined?text(args.title,'任务内容'):current?.title,scheduledDate:args.date!==undefined?date(args.date):current?.scheduledDate,scheduledTime:args.time!==undefined?time(args.time):current?.scheduledTime,recurrence:recurrence as Task['recurrence']}
+    if(!patch.title||!patch.scheduledDate||!patch.scheduledTime)throw new Error('请补充任务内容、日期和具体时间')
+    if(args.duration!==undefined&&(!Number.isInteger(args.duration)||args.duration<1||args.duration>1440))throw new Error('请明确有效时长')
+    patch.duration=args.duration??current?.duration??30
+    patch.weekdays=args.weekdays??current?.weekdays;patch.monthDay=args.monthDay??current?.monthDay
+    if(recurrence==='weekly'&&(!patch.weekdays?.length||patch.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
+    if(recurrence==='monthly'&&(!Number.isInteger(patch.monthDay)||patch.monthDay!<1||patch.monthDay!>31))throw new Error('请明确每月几号')
+    label=`${patch.scheduledDate} ${patch.scheduledTime} ${patch.title}`;calendar=true
+    run=current?()=>s.updateTask(current.id,patch):()=>s.addTask({...patch,categoryId:'work',reminderEnabled:true,reminderLead:0} as Omit<Task,'id'|'createdAt'|'updatedAt'>)
+  } else if(args.action==='complete_task'||args.action==='reopen_task') {
+    const task=selectTask(), day=args.date?date(args.date):task.recurrence==='none'?task.scheduledDate:today
+    if(!day)throw new Error('请明确完成日期')
+    const record=s.records.find(item=>item.taskId===task.id&&item.date===day)
+    label=`${day} ${task.title}`;calendar=true
+    run=()=>{if(args.action==='reopen_task'){if(record)s.deleteRecord(record.id)}else if(!record)s.addRecord({taskId:task.id,taskTitle:task.title,categoryId:task.categoryId,date:day,completedAt:Date.now(),durationSeconds:0})}
+  } else if(args.action==='delete_task') {
+    const task=selectTask();label=task.title;guard=JSON.stringify(task);calendar=true;run=()=>s.deleteTask(task.id)
+  } else if(args.action==='list_transactions') {
+    const rows=txns().filter(item=>!args.query||txnLabel(item).includes(args.query)||item.id===args.query)
+    const sum=(type:string)=>rows.filter(item=>item.type===type).reduce((total,item)=>total+Math.round(item.amount*100),0)/100
+    return {text:`共 ${rows.length} 笔，收入 ${formatMoney(sum('income'))}，支出 ${formatMoney(sum('expense'))}\n`+rows.slice(0,50).map(item=>`${txnLabel(item)}［${item.id}］`).join('\n')+(rows.length>50?'\n仅展示前50笔，合计包含全部匹配账目':''),modelStatus:'查账已在本机计算，金额和明细未发给模型'}
+  } else if(['add_transaction','update_transaction','delete_transaction'].includes(args.action)) {
+    const current=args.action==='add_transaction'?null:one(s.transactions.filter(item=>inRange(fmtDate(new Date(item.datetime)),args)&&(!args.targetDate||fmtDate(new Date(item.datetime))===args.targetDate)),args.query,item=>item.note||txnLabel(item))
+    if(args.action==='delete_transaction'){label=txnLabel(current!);guard=JSON.stringify(current);run=()=>s.deleteTransaction(current!.id)}
+    else {
+      const type=args.type??current?.type
+      if(type!=='income'&&type!=='expense')throw new Error('请明确收入还是支出')
+      const acc=args.account?account(args.account):current?s.accounts.find(item=>item.id===current.accountId):null
+      if(!acc)throw new Error('请明确使用哪个账户，名称须与记账页一致')
+      const amount=args.amountCents!==undefined?money(args.amountCents):current?.amount
+      if(amount===undefined)throw new Error('请补充金额')
+      const fallback=s.acctCategories.find(item=>item.name===(type==='income'?'其他收入':'其他支出'))
+      const cat=args.category?one(s.acctCategories.filter(item=>item.type===type||item.type==='both'),args.category,item=>item.name,true):current?s.acctCategories.find(item=>item.id===current.categoryId&&(item.type===type||item.type==='both'))||fallback:fallback
+      if(!cat)throw new Error('请先在记账页添加对应收支分类')
+      const day=args.date?date(args.date):current?fmtDate(new Date(current.datetime)):today
+      const oldTime=current?`${String(new Date(current.datetime).getHours()).padStart(2,'0')}:${String(new Date(current.datetime).getMinutes()).padStart(2,'0')}`:'12:00'
+      const datetime=args.date||args.time||!current?new Date(`${day}T${args.time?time(args.time):oldTime}:00`).getTime():current.datetime
+      const value={type,amount,accountId:acc.id,categoryId:cat.id,datetime,note:args.note!==undefined?args.note.trim():current?.note} as Omit<Transaction,'id'|'createdAt'|'updatedAt'>
+      label=`${day} ${acc.name} ${type==='income'?'收入':'支出'} ${formatMoney(amount)}`
+      run=current?()=>s.updateTransaction(current.id,value):()=>s.addTransaction(value)
+    }
+  } else if(args.action==='list_accounts') {
+    const rows=s.accounts.filter(item=>!args.query||item.name.includes(args.query)||item.id===args.query)
+    return {text:rows.length?rows.map(item=>`${item.name}：${formatMoney(accountBalance(item,s.transactions,s.transfers))}`).join('\n'):'没有对应账户',modelStatus:'账户余额已在本机计算，未发给模型'}
+  } else if(['add_account','update_account','delete_account'].includes(args.action)) {
+    const current=args.action==='add_account'?null:account(args.query)
+    if(args.action==='delete_account') {
+      if(s.transactions.some(item=>item.accountId===current!.id)||s.transfers.some(item=>item.fromAccountId===current!.id||item.toAccountId===current!.id))throw new Error('该账户已有账目或转账，不能通过助手删除')
+      label=current!.name;guard=JSON.stringify(current);run=()=>s.deleteAccount(current!.id)
+    } else {
+      const name=args.name!==undefined?text(args.name,'账户名称'):current?.name
+      if(!name)throw new Error('请补充账户名称')
+      if(s.accounts.some(item=>item.name===name&&item.id!==current?.id))throw new Error('已有同名账户，请使用不同名称')
+      const type=args.accountType??current?.type
+      if(!['cash','bank','card','alipay','wechat','other'].includes(type||''))throw new Error('请明确账户类型：现金、银行卡、信用卡、支付宝、微信或其他')
+      const initialBalance=args.initialBalanceCents!==undefined?money(args.initialBalanceCents,true,true):current?.initialBalance
+      if(initialBalance===undefined)throw new Error('请明确账户初始余额；没有余额请说0元')
+      const value={name,type:type as Account['type'],initialBalance,color:current?.color||'#4F6EF7'}
+      label=name;run=current?()=>s.updateAccount(current.id,value):()=>{s.addAccount(value)}
+    }
+  } else if(args.action==='list_notes') {
+    const rows=s.notes.filter(item=>!args.query||item.content.includes(args.query)||item.id===args.query)
+    return {text:rows.length?rows.slice(0,30).map(item=>`${item.content}［${item.id}］`).join('\n\n'):'没有对应笔记',modelStatus:'笔记查询结果仅在本机显示，未发给模型'}
+  } else if(['add_note','update_note','delete_note'].includes(args.action)) {
+    const current=args.action==='add_note'?null:one(s.notes,args.query,item=>item.content)
+    if(args.action==='delete_note'){label=current!.content.slice(0,100);guard=JSON.stringify(current);run=()=>s.deleteNote(current!.id)}
+    else {const content=text(args.content,'笔记内容',10000);label=content.slice(0,100);run=current?()=>s.updateNote(current.id,content):()=>s.addNote(content)}
+  } else if(args.action==='add_transfer') {
+    const from=account(args.fromAccount),to=account(args.toAccount)
+    if(from.id===to.id)throw new Error('转出与转入不能是同一账户')
+    const amount=money(args.amountCents),fee=args.feeCents===undefined?0:money(args.feeCents,true)
+    const day=args.date?date(args.date):today
+    label=`${from.name} → ${to.name} ${formatMoney(amount)}，手续费 ${formatMoney(fee)}`
+    run=()=>s.addTransfer({fromAccountId:from.id,toAccountId:to.id,amount,fee,datetime:new Date(`${day}T${args.time?time(args.time):'12:00'}:00`).getTime(),note:args.note})
+  }
+  if(!run)throw new Error('没有收到可执行操作')
+  if(guard) {
+    if(!approval)return {text:`请确认删除：${label}`,modelStatus:'等待用户在手机确认删除，尚未执行',pending:{args,guard,label}}
+    if(approval.guard!==guard||JSON.stringify(approval.args)!==JSON.stringify(args))throw new Error('内容已经变化，请重新发起删除；未删除任何内容')
+  }
+  run();await flushPrivateStorage()
+  let calendarText=''
+  if(calendar) {
+    if(!isCalendarSyncEnabled())calendarText='；尚未开启系统日历同步'
+    else try{const latest=useStore.getState();await syncTasksToCalendar(latest.tasks,latest.records);calendarText='；已同步系统日历'}catch{calendarText='；日历同步暂未成功，请检查日历权限'}
+  }
+  return {text:`${args.action.startsWith('delete_')?'已删除':args.action==='complete_task'?'已完成':args.action==='reopen_task'?'已恢复待办':'已保存'}：${label}${calendarText}`,modelStatus:'操作已在本机保存'+(calendarText?'，日历状态已向用户显示':'')}
+}

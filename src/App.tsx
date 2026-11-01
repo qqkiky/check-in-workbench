@@ -18,8 +18,9 @@ import { pullOnly } from './services/cloudSync'
 import { syncTasksToCalendar } from './capacitor/task-calendar'
 import { Icons } from './components/common/Icons'
 import { initAssistantSync } from './services/assistant'
+import { AgentScreen } from './screens/AgentScreen'
 
-type Tab = 'home' | 'account' | 'timeline' | 'info' | 'more' | 'notes'
+type Tab = 'home' | 'account' | 'timeline' | 'info' | 'more' | 'notes' | 'agent'
 
 // 底部主导航：Do(打卡) · 记账 · 回顾 · 资讯 · 更多（记账入口在「记账」Tab 内部，不再有中央 FAB）
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -126,6 +127,7 @@ export default function App() {
         ) : (
           <div key={animateKey} className="absolute inset-0 animate-fade-in">
             {tab === 'home' && <HomeScreen />}
+            {tab === 'agent' && <AgentScreen />}
             {tab === 'account' && <AccountingScreen />}
             {tab === 'timeline' && <TimelineReviewScreen />}
             {tab === 'info' && <InfoScreen />}
@@ -139,7 +141,7 @@ export default function App() {
       {!detailTaskId && !listOpen && (
         <nav className="shrink-0 border-t border-gray-200 bg-white/95 backdrop-blur safe-area-pb relative">
           <div className="flex">
-            {TABS.map((t) => (
+            {(Capacitor.isNativePlatform() ? [TABS[0],{key:'agent' as const,label:'助手',icon:<Icons.Sparkles size={20}/>},...TABS.slice(1)] : TABS).map((t) => (
               <button
                 key={t.key}
                 onClick={() => switchTab(t.key)}

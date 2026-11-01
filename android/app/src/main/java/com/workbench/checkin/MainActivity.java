@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TaskCalendarPlugin.class);
         registerPlugin(PrivateStoragePlugin.class);
         registerPlugin(AssistantBackgroundPlugin.class);
+        registerPlugin(AgentHttpPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

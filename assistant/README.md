@@ -36,6 +36,19 @@ npx wrangler deploy
 
 ## 行为和边界
 
+- APK 底部“助手”提供独立的本机 AI 聊天入口：在“API 设置”填写自己的服务地址、API Key、模型名。
+  采用 OpenAI 兼容 Chat Completions 工具调用；提供 DeepSeek、豆包/火山方舟、OpenAI 和自定义地址预填。
+  API 直接由手机 HTTPS 调用，不经过微信或本项目的 Cloudflare 服务；密钥和对话使用现有 Android 私有加密存储，
+  不随备份或设备同步导出。服务商可处理用户主动发送的对话及已给出的操作参数；完整账本不上传，
+  查账、余额和笔记检索结果仅在本机显示。后续模型上下文只含操作状态，不含这些查询结果。
+  本地操作覆盖日程的增改查、完成恢复和删除；记账的增改查删；账户的增改查删；笔记的增改查删和账户间转账。
+  金额、账户和日期须通过本地校验；模糊多项时追问；删除必须点击本机确认，已有账目的账户不允许由助手删除。
+  日程操作写入本机后尝试立即更新系统日历，权限不足会明确显示，不能保证模型或网络每次几秒响应。
+  此入口需要 APK 打开；不等于微信锁屏秒级同步。语音可通过系统输入法转写。
+  实现依据：[OpenAI 工具调用](https://developers.openai.com/api/docs/guides/function-calling)、
+  [DeepSeek 工具调用](https://api-docs.deepseek.com/guides/tool_calls/)、
+  [火山方舟兼容接口](https://console.volcengine.com/ark/region:cn-beijing/docs/compatible-with-openai-sdk)。
+
 - APK 自动加密保存本机数据，不再启用旧 Supabase 同步或显示 PWA 安装提示。
   “数据同步”按钮在设备端用用户自己的随机32字节密钥进行 AES-GCM 加密；云端只存密文，
   不持有此数据密钥。同步全部业务数据及偏好，但排除连接凭据、旧 Supabase 参数和本机授权状态。
