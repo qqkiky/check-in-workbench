@@ -35,6 +35,9 @@ test('local agent validates schedules, preserves identity on edits and syncs occ
  await assert.rejects(a.executeWorkbench({action:'update_task',query:id,time:'25:00'}),/几点/);
  await assert.rejects(a.executeWorkbench({action:'update_task',query:id,date:'2026-02-30'}),/日期/);
  f.calendarError=true;assert.match((await a.executeWorkbench({action:'update_task',query:id,time:'19:00'})).text,/日历同步暂未成功/);assert.equal(f.state.tasks[0].scheduledTime,'19:00');
+ f.state.tasks.push({id:'legacy',title:'旧重复任务',recurrence:'weekly',weekdays:[1],scheduledTime:'09:00'});
+ await a.executeWorkbench({action:'update_task',query:'旧重复任务',time:'10:00'});assert.equal(f.state.tasks.find(t=>t.id==='legacy').scheduledTime,'10:00');
+ f.state.tasks.push({id:'quick',title:'临时小事',recurrence:'none',isQuick:true});await a.executeWorkbench({action:'update_task',query:'临时小事',title:'修改后的小事'});assert.equal(f.state.tasks.find(t=>t.id==='quick').title,'修改后的小事');
 });
 
 test('money and accounts are explicit; moving a bill preserves identity and transfers do not inflate expenses',async()=>{

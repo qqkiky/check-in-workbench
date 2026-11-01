@@ -68,13 +68,13 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
     const recurrence=args.recurrence??current?.recurrence??'none'
     if(!['none','daily','weekly','monthly'].includes(recurrence))throw new Error('重复方式不正确')
     const patch:Partial<Task>={title:args.title!==undefined?text(args.title,'任务内容'):current?.title,scheduledDate:args.date!==undefined?date(args.date):current?.scheduledDate,scheduledTime:args.time!==undefined?time(args.time):current?.scheduledTime,recurrence:recurrence as Task['recurrence']}
-    if(!patch.title||!patch.scheduledDate||!patch.scheduledTime)throw new Error('请补充任务内容、日期和具体时间')
+    if(!patch.title||(!current?.isQuick&&(!patch.scheduledTime||(!patch.scheduledDate&&(!current||recurrence==='none')))))throw new Error('请补充任务内容、日期和具体时间')
     if(args.duration!==undefined&&(!Number.isInteger(args.duration)||args.duration<1||args.duration>1440))throw new Error('请明确有效时长')
     patch.duration=args.duration??current?.duration??30
     patch.weekdays=args.weekdays??current?.weekdays;patch.monthDay=args.monthDay??current?.monthDay
     if(recurrence==='weekly'&&(!patch.weekdays?.length||patch.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
     if(recurrence==='monthly'&&(!Number.isInteger(patch.monthDay)||patch.monthDay!<1||patch.monthDay!>31))throw new Error('请明确每月几号')
-    label=`${patch.scheduledDate} ${patch.scheduledTime} ${patch.title}`;calendar=true
+    label=`${patch.scheduledDate||'未指定单次日期'} ${patch.scheduledTime||''} ${patch.title}`;calendar=true
     run=current?()=>s.updateTask(current.id,patch):()=>s.addTask({...patch,categoryId:'work',reminderEnabled:true,reminderLead:0} as Omit<Task,'id'|'createdAt'|'updatedAt'>)
   } else if(args.action==='complete_task'||args.action==='reopen_task') {
     const task=selectTask(), day=args.date?date(args.date):task.recurrence==='none'?task.scheduledDate:today
