@@ -55,16 +55,16 @@ function ToastView({ toast, onDismiss }: { toast: ToastState; onDismiss: () => v
   }, [toast, onDismiss])
 
   return (
-    <div className="fixed top-12 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center" key={toast.id}>
-      <div className="flex items-center gap-3 px-4 py-2.5 bg-black/80 backdrop-blur text-white text-sm rounded-full shadow-lg animate-in fade-in slide-in-from-top-2 max-w-[92%]">
-        <span className="whitespace-nowrap">{toast.message}</span>
+    <div className="fixed left-4 right-4 z-50 flex flex-col items-center" style={{ top: 'calc(var(--app-safe-top) + 12px)' }} key={toast.id}>
+      <div className="flex max-w-full items-center gap-3 px-4 py-2.5 bg-black/80 backdrop-blur text-white text-sm rounded-2xl shadow-lg animate-in fade-in slide-in-from-top-2">
+        <span className="min-w-0 break-words whitespace-normal">{toast.message}</span>
         {toast.actionText && (
           <button
             onClick={() => {
               toast.onAction?.()
               onDismiss()
             }}
-            className="font-semibold text-blue-300 whitespace-nowrap active:opacity-70"
+            className="shrink-0 font-semibold text-blue-300 whitespace-nowrap active:opacity-70"
           >
             {toast.actionText}
           </button>
