@@ -46,19 +46,21 @@ export function applyActions(tasks, actions, now = Date.now(), sourceId = 'manua
         next.push({ ...task, version: 1, updatedAt: now });
         replies.push(`已记录：${task.date} ${task.time} ${task.title}`);
       } catch { replies.push('日期或时间不明确，请补充，例如“明天下午3点写报告”。'); }
-    } else if (['complete', 'cancel', 'reschedule'].includes(action.type)) {
+    } else if (['complete', 'cancel', 'reschedule', 'update'].includes(action.type)) {
       const result = resolveTask(next, action.taskId || action.query);
       if (result.error) { replies.push(result.error); continue; }
       const task = result.task;
-      if (action.type === 'reschedule') {
-        try { Object.assign(task, safeTask({ ...task, date: action.date, time: action.time })); }
+      if (action.type === 'reschedule' || action.type === 'update') {
+        const changes=action.type==='reschedule'?{date:action.date,time:action.time}:Object.fromEntries(['title','date','time'].filter(key=>action[key]!==undefined).map(key=>[key,action[key]]));
+        try { Object.assign(task, safeTask({ ...task, ...changes })); }
         catch { replies.push('改期时间不明确，请补充日期和具体时间。'); continue; }
+        delete task.lastReminderAt;delete task.reminderCount;
       } else {
         task.status = action.type === 'complete' ? 'completed' : 'cancelled';
         task.completedAt = action.type === 'complete' ? now : null;
       }
       task.version++; task.updatedAt = now;
-      replies.push(`${action.type === 'complete' ? '✅ 已完成' : action.type === 'cancel' ? '已取消' : '已改期'}：${task.title}`);
+      replies.push(`${action.type === 'complete' ? '✅ 已完成' : action.type === 'cancel' ? '已取消' : '已更新'}：${['update','reschedule'].includes(action.type)?`${task.date} ${task.time} `:''}${task.title}`);
     } else if (action.type === 'clarify' && typeof action.question === 'string') {
       replies.push(action.question.slice(0,300));
     }
