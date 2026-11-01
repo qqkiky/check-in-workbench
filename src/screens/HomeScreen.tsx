@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from '@/store'
 import { TaskCard } from '@/components/tasks/TaskCard'
 import { Icons } from '@/components/common/Icons'
@@ -39,7 +39,7 @@ export function HomeScreen() {
   const [quickText, setQuickText] = useState('')
   const [showEvents, setShowEvents] = useState(false)
   const [defaultScheduledDate, setDefaultScheduledDate] = useState<string | undefined>(undefined)
-  // 周视图点某天后跳转到的「那一天」；为 null 表示看今天
+  // 日、周和时间线共用所查看的日期；为 null 表示看今天
   const [focusDate, setFocusDate] = useState<Date | null>(null)
   // 打卡时弹出的「时间选择」暂存（选好起止时间后写入记录）
   const [pendingCheckIn, setPendingCheckIn] = useState<{
@@ -60,11 +60,7 @@ export function HomeScreen() {
   // ===== 日视图：聚焦某天（默认今天）的任务 =====
   const viewDate = focusDate ?? today
   const viewDateKey = fmtDate(viewDate)
-  // 时间线跨天浏览：独立日期（默认跟随日视图聚焦日，可通过时间线内导航切换）
-  const [timelineDate, setTimelineDate] = useState<string>(viewDateKey)
-  useEffect(() => {
-    setTimelineDate(viewDateKey)
-  }, [viewDateKey])
+  const timelineDate = viewDateKey
   const upcomingEvents = useMemo(() => getUpcomingEvents(today, 120), [today])
   // 未来的事件（按日期升序，第一个即最近），供左上角时钟角标与弹层使用
   const futureEvents = useMemo(
@@ -82,8 +78,9 @@ export function HomeScreen() {
       ? daysUntil(today, futureEvents[0].date)
       : null
 
-  // ===== 周视图：可按周偏移查看任意过往周次 =====
-  const weekStart = useMemo(() => dt.startOfWeek(today, 1), [today])
+  // ===== 周视图：跟随所查看日期所在的周 =====
+  const weekStart = useMemo(() => dt.startOfWeek(viewDate, 1), [viewDate])
+  const isCurrentWeek = fmtDate(weekStart) === fmtDate(dt.startOfWeek(today, 1))
   const weekDates = useMemo(() => {
     const arr: Date[] = []
     for (let i = 0; i < 7; i++) arr.push(dt.addDays(weekStart, i))
@@ -95,7 +92,7 @@ export function HomeScreen() {
   // - 每周重复（weekdays）→ 按星期几展开到本周匹配日
   // - 每月重复（monthDay）→ 本周内「几号」命中的那天
   // - 每日重复 → 展开到本周每一天
-  // - 一次性任务有 scheduledDate 且在本周 → 落在该天；否则归到今天
+  // - 指定日期的一次性任务只在所属周显示
   const weekTaskInstances = useMemo(() => {
     const out: Array<{ task: Task; dateKey: string }> = []
     for (const t of tasks) {
@@ -117,8 +114,8 @@ export function HomeScreen() {
         continue
       }
       // 不重复（一次性）
-      if (t.scheduledDate && weekDateKeys.includes(t.scheduledDate)) {
-        out.push({ task: t, dateKey: t.scheduledDate })
+      if (t.scheduledDate) {
+        if (weekDateKeys.includes(t.scheduledDate)) out.push({ task: t, dateKey: t.scheduledDate })
         continue
       }
       // 无明确日期的一次性任务：归入所查看周的周一（保证在查看过往周时也能出现）
@@ -253,10 +250,14 @@ export function HomeScreen() {
     showToast('已添加小事')
   }
 
+  const changeDate = (dateKey: string) => {
+    if (dateKey) setFocusDate(dateKey === fmtDate(today) ? null : new Date(dateKey + 'T00:00:00'))
+  }
+  const shiftViewDate = (days: number) => changeDate(fmtDate(dt.addDays(viewDate, days)))
+
   // 周视图点某一天 → 跳转到那一天的日视图（而非直接新建）
   const handlePickDate = (dateKey: string) => {
-    const d = weekDates.find((x) => fmtDate(x) === dateKey) ?? new Date(dateKey)
-    setFocusDate(d)
+    changeDate(dateKey)
     setViewMode('today')
   }
 
@@ -268,15 +269,9 @@ export function HomeScreen() {
   }
 
   // ===== 时间线跨天浏览 =====
-  const timelinePrevDay = () => {
-    const d = dt.addDays(new Date(timelineDate + 'T00:00:00'), -1)
-    setTimelineDate(fmtDate(d))
-  }
-  const timelineNextDay = () => {
-    const d = dt.addDays(new Date(timelineDate + 'T00:00:00'), 1)
-    setTimelineDate(fmtDate(d))
-  }
-  const timelinePickDate = (k: string) => setTimelineDate(k)
+  const timelinePrevDay = () => shiftViewDate(-1)
+  const timelineNextDay = () => shiftViewDate(1)
+  const timelinePickDate = changeDate
   const openAddNote = () => {
     const isToday = timelineDate === fmtDate(today)
     const nowHHmm = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`
@@ -317,13 +312,56 @@ export function HomeScreen() {
             +
           </button>
         </div>
-        <div className="flex items-center justify-between">
+        {viewMode !== 'quick' ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => shiftViewDate(viewMode === 'week' ? -7 : -1)}
+              className="w-9 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-gray-600 active:scale-95"
+              aria-label={viewMode === 'week' ? '上一周' : '上一天'}
+            >
+              <Icons.ChevronLeft size={18} />
+            </button>
+            <label className="relative flex-1 min-w-0 rounded-xl bg-white py-1.5 text-center cursor-pointer">
+              <span className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-800 whitespace-nowrap">
+                <Icons.Calendar size={14} />
+                {viewMode === 'week'
+                  ? `${dt.format(weekStart, 'yyyy/MM/dd')}–${dt.format(weekDates[6], weekStart.getFullYear() === weekDates[6].getFullYear() ? 'MM/dd' : 'yyyy/MM/dd')}`
+                  : dt.format(viewDate, 'yyyy/MM/dd')}
+              </span>
+              <span className="block text-[10px] text-gray-400">
+                {viewMode === 'week' ? '选择日期查看所在周' : `${dt.format(viewDate, 'EEEE')} ${getLunarDay(viewDate)}`}
+              </span>
+              <input
+                type="date"
+                value={viewDateKey}
+                onChange={(e) => changeDate(e.target.value)}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                aria-label="查看日期"
+              />
+            </label>
+            <button
+              onClick={() => shiftViewDate(viewMode === 'week' ? 7 : 1)}
+              className="w-9 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-gray-600 active:scale-95"
+              aria-label={viewMode === 'week' ? '下一周' : '下一天'}
+            >
+              <Icons.ChevronRight size={18} />
+            </button>
+            <button
+              onClick={() => setFocusDate(null)}
+              disabled={viewMode === 'week' ? isCurrentWeek : viewDateKey === fmtDate(today)}
+              className="shrink-0 px-2 h-10 rounded-xl bg-primary/10 text-primary text-xs active:scale-95 disabled:opacity-40"
+              aria-label={viewMode === 'week' ? '回到本周' : '回到今天'}
+            >
+              {viewMode === 'week' ? '本周' : '今天'}
+            </button>
+          </div>
+        ) : <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span className="font-semibold text-gray-700">{dt.format(today, 'EEEE')}</span>
             <span>{dt.format(today, 'yyyy/MM/dd')}</span>
             <span className="text-gray-400">{getLunarDay(today)}</span>
           </div>
-        </div>
+        </div>}
         <div className="mt-3 flex items-center justify-between">
           <div className="flex bg-gray-100 rounded-full p-0.5">
             {viewTabs.map((m) => (
@@ -331,7 +369,6 @@ export function HomeScreen() {
                 key={m.key}
                 onClick={() => {
                   setViewMode(m.key)
-                  setFocusDate(null)
                 }}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                   viewMode === m.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
@@ -358,7 +395,7 @@ export function HomeScreen() {
             categories={categories}
             viewDate={viewDate}
             viewDateKey={viewDateKey}
-            focused={focusDate !== null}
+            focused={viewDateKey !== fmtDate(today)}
             showTimeline={showTimeline}
             onToggleTimeline={toggleTimeline}
             onAddNote={openAddNote}
@@ -371,7 +408,6 @@ export function HomeScreen() {
             onCheckIn={(taskId, done) => handleCheckIn(taskId, done, viewDateKey)}
             onAdd={openAdd}
             onBack={() => {
-              setFocusDate(null)
               setViewMode('week')
             }}
             onArchive={(id) => {
@@ -391,6 +427,7 @@ export function HomeScreen() {
             weekDates={weekDates}
             weekDateKeys={weekDateKeys}
             today={today}
+            isCurrentWeek={isCurrentWeek}
             grouped={weekGrouped}
             categories={categories}
             onCheckIn={handleCheckIn}
@@ -402,7 +439,7 @@ export function HomeScreen() {
               setEditingTaskId(id)
               setShowForm(true)
             }}
-            onAdd={() => setShowForm(true)}
+            onAdd={openAdd}
             onPickDate={handlePickDate}
           />
         )}
@@ -679,6 +716,7 @@ function WeekView({
   weekDates,
   weekDateKeys,
   today,
+  isCurrentWeek,
   grouped,
   categories,
   onCheckIn,
@@ -691,6 +729,7 @@ function WeekView({
   weekDates: Date[]
   weekDateKeys: string[]
   today: Date
+  isCurrentWeek: boolean
   grouped: Record<string, Array<Task & { completed: boolean }>>
   categories: Category[]
   onCheckIn: (id: string, done: boolean, dateKey: string) => void
@@ -759,7 +798,7 @@ function WeekView({
 
       {/* 进度概览 */}
       <div className="mt-2 px-2 text-[11px] text-gray-500 flex items-center justify-between">
-        <span>本周 {doneCount}/{totalCount} 已完成</span>
+        <span>{isCurrentWeek ? '本周' : '所选周'} {doneCount}/{totalCount} 已完成</span>
         <button
           onClick={onAdd}
           className="text-primary active:scale-95"
@@ -823,7 +862,7 @@ function WeekView({
             <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3 text-gray-300">
               <Icons.Calendar size={28} />
             </div>
-            <p className="text-sm">本周还没有任务</p>
+            <p className="text-sm">{isCurrentWeek ? '本周' : '所选周'}还没有任务</p>
             <button
               onClick={onAdd}
               className="mt-3 px-4 py-2 bg-primary text-white rounded-full text-sm font-medium active:scale-95"
