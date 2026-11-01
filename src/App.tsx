@@ -19,6 +19,7 @@ import { syncTasksToCalendar } from './capacitor/task-calendar'
 import { Icons } from './components/common/Icons'
 import { initAssistantSync } from './services/assistant'
 import { AgentScreen } from './screens/AgentScreen'
+import { listenForQuickChat } from './services/quickChat'
 
 type Tab = 'home' | 'account' | 'timeline' | 'info' | 'more' | 'notes' | 'agent'
 
@@ -40,9 +41,17 @@ export default function App() {
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
   const [listOpen, setListOpen] = useState(false)
   const [animateKey, setAnimateKey] = useState(0)
+  const [quickChatRequest, setQuickChatRequest] = useState(0)
 
   useReminderScheduler()
   const openNotes = () => setTab('notes')
+
+  useEffect(() => listenForQuickChat(() => {
+    setDetailTaskId(null)
+    setListOpen(false)
+    setTab('agent')
+    setQuickChatRequest(value => value + 1)
+  }), [])
 
   useEffect(() => {
     init()
@@ -127,7 +136,7 @@ export default function App() {
         ) : (
           <div key={animateKey} className="absolute inset-0 animate-fade-in">
             {tab === 'home' && <HomeScreen />}
-            {tab === 'agent' && <AgentScreen />}
+            {tab === 'agent' && <AgentScreen quickChatRequest={quickChatRequest} />}
             {tab === 'account' && <AccountingScreen />}
             {tab === 'timeline' && <TimelineReviewScreen />}
             {tab === 'info' && <InfoScreen />}

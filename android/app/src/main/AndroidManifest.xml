@@ -37,6 +37,17 @@
 
         </activity>
 
+        <service
+            android:name=".QuickChatTileService"
+            android:label="@string/quick_chat_label"
+            android:icon="@drawable/ic_quick_chat"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

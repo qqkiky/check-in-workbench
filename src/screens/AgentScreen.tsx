@@ -11,7 +11,7 @@ const PRESETS=[
   {name:'OpenAI',url:'https://api.openai.com/v1',model:''},
   {name:'自定义',url:'',model:''},
 ]
-export function AgentScreen() {
+export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
   const [config,setConfig]=useState<AgentConfig>(()=>readAgentConfig()||{url:PRESETS[0].url,key:'',model:PRESETS[0].model})
   const [history,setHistory]=useState<AgentHistory>(readAgentHistory)
   const [open,setOpen]=useState(()=>!readAgentConfig())
@@ -24,6 +24,7 @@ export function AgentScreen() {
   const voice=useRef<HoldToTalk|null>(null)
   if(!voice.current)voice.current=new HoldToTalk(NativeSpeech,{phase:setVoicePhase,text:text=>voiceSend.current(text),error:setError})
   const voiceActive=voicePhase!=='idle'
+  useEffect(()=>{if(quickChatRequest)setVoiceMode(true)},[quickChatRequest])
   const bottom=useRef<HTMLDivElement>(null)
   useEffect(()=>{bottom.current?.scrollIntoView({block:'end'})},[history,busy])
   useEffect(()=>{

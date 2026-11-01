@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AssistantBackgroundPlugin.class);
         registerPlugin(AgentHttpPlugin.class);
         registerPlugin(VoiceInputPlugin.class);
+        registerPlugin(QuickChatPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
