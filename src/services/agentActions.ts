@@ -1,6 +1,7 @@
 import { useStore } from '@/store'
 import { flushPrivateStorage } from './appStorage'
-import { fmtDate } from '@/utils/date'
+import { fmtDate, dt } from '@/utils/date'
+import { taskOccursOnDate, recurrenceShortLabel } from '@/utils/recurrence'
 import { accountBalance, formatMoney } from '@/utils/accounting'
 import { syncTasksToCalendar, isCalendarSyncEnabled } from '@/capacitor/task-calendar'
 import type { Task, Transaction, Account } from '@/types'
@@ -60,8 +61,12 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
   const txns=()=>s.transactions.filter(item=>inRange(fmtDate(new Date(item.datetime)),args)&&(!args.date||fmtDate(new Date(item.datetime))===date(args.date))&&(!args.type||item.type===args.type)&&(!args.account||item.accountId===account(args.account).id))
   let run:(()=>void)|undefined, label='', guard='', calendar=false
   if(args.action==='list_tasks') {
-    const rows=taskList.filter(item=>(!args.query||item.title.includes(args.query))&&(!args.date||(item.recurrence==='daily'||item.recurrence==='weekly'&&item.weekdays?.includes(new Date(date(args.date)+'T00:00:00').getDay())||item.recurrence==='monthly'&&item.monthDay===new Date(args.date+'T00:00:00').getDate()||item.recurrence==='none'&&item.scheduledDate===args.date)))
-    return {text:rows.length?rows.slice(0,50).map(item=>`${s.records.some(record=>record.taskId===item.id&&record.date===(args.date||item.scheduledDate||today))?'✅':'□'} ${args.date||item.scheduledDate||'重复任务'} ${item.scheduledTime||''} ${item.title}［${item.id}］`).join('\n'):'没有符合条件的待办',modelStatus:'查询已在本机完成，结果仅向用户显示'}
+    const selected=taskList.filter(item=>!args.query||item.title.includes(args.query)||item.id===args.query)
+    const start=args.date||args.startDate,end=args.date||args.endDate
+    if((start&&!end)||(!start&&end))throw new Error('请提供查询的起止日期')
+    if(start&&end&&dt.differenceInDays(new Date(end+'T00:00:00'),new Date(start+'T00:00:00'))>366)throw new Error('请把待办查询范围缩短到一年内')
+    const rows=start&&end?dt.eachDayOfInterval({start:new Date(start+'T00:00:00'),end:new Date(end+'T00:00:00')}).flatMap(day=>selected.filter(item=>taskOccursOnDate(item,day)).map(item=>({item,day:fmtDate(day)}))):selected.map(item=>({item,day:item.scheduledDate||today}))
+    return {text:rows.length?rows.slice(0,50).map(({item,day})=>`${s.records.some(record=>record.taskId===item.id&&record.date===day)?'✅':'□'} ${start?day:recurrenceShortLabel(item)||item.scheduledDate||'未指定日期'} ${item.scheduledTime||''} ${item.title}［${item.id}］`).join('\n')+(rows.length>50?`\n共${rows.length}项，仅展示前50项`:''):'没有符合条件的待办',modelStatus:'查询已在本机完成，结果仅向用户显示'}
   }
   if(args.action==='add_task'||args.action==='update_task') {
     const current=args.action==='update_task'?selectTask():null
@@ -85,7 +90,10 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
   } else if(args.action==='delete_task') {
     const task=selectTask();label=task.title;guard=JSON.stringify(task);calendar=true;run=()=>s.deleteTask(task.id)
   } else if(args.action==='list_transactions') {
-    const rows=txns().filter(item=>!args.query||txnLabel(item).includes(args.query)||item.id===args.query)
+    const categories=args.category?s.acctCategories.filter(item=>(item.name===args.category||item.id===args.category)&&(!args.type||item.type===args.type||item.type==='both')):[]
+    if(args.category&&categories.length!==1)throw new Error('请明确唯一的收支分类名称，必要时补充收入或支出')
+    if(args.amountCents!==undefined)money(args.amountCents)
+    const rows=txns().filter(item=>(!args.query||txnLabel(item).includes(args.query)||item.id===args.query)&&(!args.category||item.categoryId===categories[0].id)&&(args.amountCents===undefined||Math.round(item.amount*100)===args.amountCents))
     const sum=(type:string)=>rows.filter(item=>item.type===type).reduce((total,item)=>total+Math.round(item.amount*100),0)/100
     return {text:`共 ${rows.length} 笔，收入 ${formatMoney(sum('income'))}，支出 ${formatMoney(sum('expense'))}\n`+rows.slice(0,50).map(item=>`${txnLabel(item)}［${item.id}］`).join('\n')+(rows.length>50?'\n仅展示前50笔，合计包含全部匹配账目':''),modelStatus:'查账已在本机计算，金额和明细未发给模型'}
   } else if(['add_transaction','update_transaction','delete_transaction'].includes(args.action)) {

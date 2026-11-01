@@ -38,6 +38,7 @@ test('local agent validates schedules, preserves identity on edits and syncs occ
  f.state.tasks.push({id:'legacy',title:'旧重复任务',recurrence:'weekly',weekdays:[1],scheduledTime:'09:00'});
  await a.executeWorkbench({action:'update_task',query:'旧重复任务',time:'10:00'});assert.equal(f.state.tasks.find(t=>t.id==='legacy').scheduledTime,'10:00');
  f.state.tasks.push({id:'quick',title:'临时小事',recurrence:'none',isQuick:true});await a.executeWorkbench({action:'update_task',query:'临时小事',title:'修改后的小事'});assert.equal(f.state.tasks.find(t=>t.id==='quick').title,'修改后的小事');
+ const range=await a.executeWorkbench({action:'list_tasks',startDate:'2026-11-02',endDate:'2026-11-08'});assert.match(range.text,/2026-11-02 10:00 旧重复任务/);assert.ok(!range.text.includes('整理测试资料'));
 });
 
 test('money and accounts are explicit; moving a bill preserves identity and transfers do not inflate expenses',async()=>{
@@ -49,6 +50,8 @@ test('money and accounts are explicit; moving a bill preserves identity and tran
  const bill=f.state.transactions[0];assert.equal(bill.id,id);assert.equal(bill.accountId,'cash');assert.equal(bill.type,'income');assert.equal(bill.categoryId,'in');assert.equal(new Date(bill.datetime).getHours(),9);
  await a.executeWorkbench({action:'add_transfer',fromAccount:'微信',toAccount:'现金',amountCents:1000,feeCents:100});assert.equal(f.state.transactions.length,1);assert.equal(f.state.transfers.length,1);
  assert.match((await a.executeWorkbench({action:'list_accounts'})).text,/89.00/);
+ f.state.transactions.push({...bill,id:'other',type:'expense',categoryId:'out',amount:99});
+ const query=await a.executeWorkbench({action:'list_transactions',category:'其他收入',amountCents:3000});assert.match(query.text,/共 1 笔，收入 ¥30.00，支出 ¥0.00/);
  await assert.rejects(a.executeWorkbench({action:'delete_account',query:'现金'}),/不能/);
  await assert.rejects(a.executeWorkbench({action:'add_account',name:'储蓄',accountType:'bank'}),/初始余额/);
  await a.executeWorkbench({action:'add_account',name:'储蓄',accountType:'bank',initialBalanceCents:0});assert.equal(f.state.accounts.length,3);
