@@ -16,6 +16,7 @@ export function AgentScreen() {
   const [open,setOpen]=useState(()=>!readAgentConfig())
   const [busy,setBusy]=useState(false),[testing,setTesting]=useState(false)
   const [input,setInput]=useState(''),[showKey,setShowKey]=useState(false),[error,setError]=useState('')
+  const [settingsError,setSettingsError]=useState('')
   const bottom=useRef<HTMLDivElement>(null)
   useEffect(()=>{bottom.current?.scrollIntoView({block:'end'})},[history,busy])
   useEffect(()=>{
@@ -81,21 +82,26 @@ export function AgentScreen() {
       <button disabled={busy||!input.trim()} type="submit" className="px-4 py-3 bg-primary rounded-xl text-white text-sm disabled:opacity-40">发送</button>
     </form>
     <Modal open={open} onClose={()=>{if(!testing)setOpen(false)}} title="AI 服务设置">
-      <div className="space-y-4">
+      <form noValidate className="space-y-4" onSubmit={async e=>{
+        e.preventDefault()
+        if(testing)return
+        const fields=new FormData(e.currentTarget)
+        const candidate={url:String(fields.get('url')||'').trim(),key:String(fields.get('key')||'').trim(),model:String(fields.get('model')||'').trim()}
+        setConfig(candidate);setSettingsError('');setTesting(true)
+        try{await testAgent(candidate);await saveAgentConfig(candidate);setHistory(readAgentHistory());setOpen(false);showToast('AI 服务已连接，配置已加密保存')}
+        catch(e){setSettingsError(e instanceof Error?e.message:'连接失败，请重试')}
+        finally{setTesting(false)}
+      }}>
         <p className="text-xs text-gray-500">使用你自己的开发者 API Key，费用或免费额度由服务商决定。密钥仅加密保存在这台手机，不随备份和设备同步导出。</p>
-        <div className="flex gap-2 flex-wrap">{PRESETS.map(preset=><button key={preset.name} disabled={testing} onClick={()=>setConfig({...config,url:preset.url,model:preset.model,key:''})} className="rounded-full px-3 py-1.5 bg-gray-100 text-xs disabled:opacity-40">{preset.name}</button>)}</div>
-        <label className="block text-sm">服务地址<input value={config.url} disabled={testing} onChange={e=>setConfig({...config,url:e.target.value})} type="url" autoCapitalize="none" autoCorrect="off" placeholder="https://服务地址/v1" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
-        <label className="block text-sm">API Key<input value={config.key} disabled={testing} onChange={e=>setConfig({...config,key:e.target.value})} type={showKey?'text':'password'} autoComplete="off" autoCapitalize="none" autoCorrect="off" placeholder="只填在这里，不要发到对话里" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
-        <button onClick={()=>setShowKey(!showKey)} className="text-xs text-primary">{showKey?'隐藏密钥':'显示密钥'}</button>
-        <label className="block text-sm">模型名／接入点 ID<input value={config.model} disabled={testing} onChange={e=>setConfig({...config,model:e.target.value})} autoCapitalize="none" autoCorrect="off" placeholder="填写服务商控制台提供的模型名" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
+        <div className="flex gap-2 flex-wrap">{PRESETS.map(preset=><button type="button" key={preset.name} disabled={testing} onClick={()=>{setConfig({...config,url:preset.url,model:preset.model,key:''});setSettingsError('')}} className="rounded-full px-3 py-1.5 bg-gray-100 text-xs disabled:opacity-40">{preset.name}</button>)}</div>
+        <label className="block text-sm">服务地址<input name="url" value={config.url} disabled={testing} onChange={e=>setConfig({...config,url:e.target.value})} type="url" autoCapitalize="none" autoCorrect="off" placeholder="https://服务地址/v1" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
+        <label className="block text-sm">API Key<input name="key" value={config.key} disabled={testing} onChange={e=>setConfig({...config,key:e.target.value})} type={showKey?'text':'password'} autoComplete="off" autoCapitalize="none" autoCorrect="off" placeholder="只填在这里，不要发到对话里" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
+        <button type="button" disabled={testing} onClick={()=>setShowKey(!showKey)} className="text-xs text-primary">{showKey?'隐藏密钥':'显示密钥'}</button>
+        <label className="block text-sm">模型名／接入点 ID<input name="model" value={config.model} disabled={testing} onChange={e=>setConfig({...config,model:e.target.value})} autoCapitalize="none" autoCorrect="off" placeholder="填写服务商控制台提供的模型名" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
         <p className="text-xs text-gray-400">支持 OpenAI 兼容的 Chat Completions 和工具调用。切换服务地址或模型会清空旧对话，避免把旧对话自动发给另一家服务商。</p>
-        <button disabled={testing||!config.url||!config.key||!config.model} onClick={async()=>{
-          setTesting(true)
-          try{await testAgent(config);await saveAgentConfig(config);setHistory(readAgentHistory());setOpen(false);showToast('AI 服务已连接，配置已加密保存')}
-          catch(e){showToast(e instanceof Error?e.message:'连接失败')}
-          finally{setTesting(false)}
-        }} className="w-full rounded-xl bg-primary text-white p-3 disabled:opacity-40">{testing?'连接测试中…':'测试连接并保存'}</button>
-      </div>
+        {settingsError&&<p role="alert" className="text-sm text-red-600 bg-red-50 p-3 rounded-xl break-words">{settingsError}</p>}
+        <button type="submit" disabled={testing} className="w-full rounded-xl bg-primary text-white p-3 disabled:opacity-40">{testing?'连接测试中…':'测试连接并保存'}</button>
+      </form>
     </Modal>
   </div>
 }

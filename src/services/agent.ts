@@ -15,10 +15,18 @@ export function agentEndpoint(raw:string) {
   return url.href.replace(/\/$/,'').replace(/\/chat\/completions$/,'')+'/chat/completions'
 }
 export function readAgentConfig():AgentConfig|null { try{return JSON.parse(appStorage.getItem(CONFIG)||'null')}catch{return null} }
+export function validateAgentConfig(config:AgentConfig):AgentConfig {
+  const url=config.url.trim(),key=config.key.trim(),model=config.model.trim()
+  if(!url)throw new Error('请填写服务地址')
+  if(!key)throw new Error('请填写 API Key')
+  if(!model)throw new Error('请填写模型名／接入点 ID')
+  if(key.length>1000||/[\r\n]/.test(key))throw new Error('API Key 格式不正确，请重新粘贴')
+  if(model.length>200)throw new Error('模型名太长，请核对服务商提供的名称')
+  return {url:agentEndpoint(url).replace(/\/chat\/completions$/,''),key,model}
+}
 export async function saveAgentConfig(config:AgentConfig) {
   if(Capacitor.getPlatform()!=='android')throw new Error('API 密钥仅支持保存在 Android 应用中')
-  const clean={url:agentEndpoint(config.url).replace(/\/chat\/completions$/,''),key:config.key.trim(),model:config.model.trim()}
-  if(!clean.key||clean.key.length>1000||/[\r\n]/.test(clean.key)||!clean.model||clean.model.length>200)throw new Error('请填写有效的 API Key 和模型名')
+  const clean=validateAgentConfig(config)
   const previous=readAgentConfig()
   await saveStorageBatch({[CONFIG]:JSON.stringify(clean),...(previous&&(previous.url!==clean.url||previous.model!==clean.model)?{[HISTORY]:JSON.stringify({messages:[],entries:[]})}:{})})
 }
@@ -47,7 +55,7 @@ export async function requestAgent(config:AgentConfig,messages:AgentMessage[],to
   return response.json()
 }
 export async function testAgent(config:AgentConfig) {
-  const result=await requestAgent(config,[{role:'user',content:'连接测试，请只回复“连接成功”，不要调用工具。'}])
+  const result=await requestAgent(validateAgentConfig(config),[{role:'user',content:'连接测试，请只回复“连接成功”，不要调用工具。'}])
   if(!result?.choices?.[0]?.message)throw new Error('接口返回格式不兼容，请使用 Chat Completions 接口')
 }
 let busy=false

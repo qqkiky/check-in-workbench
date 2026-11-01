@@ -104,3 +104,16 @@ test('configuration is Android-only and history never persists executable deleti
  await a.saveAgentConfig({...config,url:'https://other.example/v1'});assert.equal(a.readAgentHistory().entries.length,0);
  f.diskError=true;await assert.rejects(a.saveAgentConfig(config),/disk_error/);assert.equal(a.readAgentConfig().url,'https://other.example/v1');
 });
+
+test('connection validation explains each missing field before sending any API request',async()=>{
+ const {service:a}=await load();const original=globalThis.fetch;let requests=0;
+ globalThis.fetch=async()=>{requests++;throw Error('unexpected request')};
+ try{
+  const config={url:'https://api.example/v1',key:'TEST_KEY',model:'deepseek-flash'};
+  await assert.rejects(a.testAgent({...config,url:' '}),/服务地址/);
+  await assert.rejects(a.testAgent({...config,key:' '}),/API Key/);
+  await assert.rejects(a.testAgent({...config,model:' '}),/模型名/);
+  assert.equal(requests,0);
+  assert.deepEqual(a.validateAgentConfig({url:' https://api.example/v1/ ',key:' TEST_KEY ',model:' deepseek-flash '}),config);
+ }finally{globalThis.fetch=original}
+});
