@@ -56,14 +56,16 @@ public class InputConnectionTest {
             waitFor("document.querySelector("+JSONObject.quote(note)+").value==='整理测试资料'");
             eval("[...document.querySelectorAll('.modal-content button')].find(button=>button.textContent.trim()==='添加').click()");
             waitFor("!document.querySelector("+JSONObject.quote(title)+")");
-            long end=System.currentTimeMillis()+10000;boolean saved=false;
+            long end=System.currentTimeMillis()+10000;boolean saved=false;String savedTitles="";
             while(System.currentTimeMillis()<end&&!saved){
                 JSONObject values=PrivateStoragePlugin.readValues(InstrumentationRegistry.getInstrumentation().getTargetContext());
                 JSONArray tasks=new JSONArray(values.optString("wb.tasks.v1","[]"));
-                for(int i=0;i<tasks.length();i++){JSONObject task=tasks.getJSONObject(i);if("键盘回归测试".equals(task.optString("title"))){assertEquals("整理测试资料",task.optString("description"));saved=true;}}
+                JSONArray titles=new JSONArray();
+                for(int i=0;i<tasks.length();i++){JSONObject task=tasks.getJSONObject(i);titles.put(task.optString("title"));if("键盘回归测试".equals(task.optString("title"))){assertEquals("整理测试资料",task.optString("description"));saved=true;}}
+                savedTitles=titles.toString();
                 if(!saved)Thread.sleep(100);
             }
-            assertTrue("Native keyboard text never reached the saved task",saved);
+            assertTrue("Native keyboard text never reached the saved task; titles="+savedTitles+"; platform="+eval("window.Capacitor.getPlatform()"),saved);
         }
     }
 }

@@ -24,7 +24,7 @@ import org.json.JSONObject;
 @CapacitorPlugin(name = "PrivateStorage")
 public class PrivateStoragePlugin extends Plugin {
     private static final String ALIAS = "checkin.private.v1";
-    public static JSONObject readValues(Context context) throws Exception {
+    public static synchronized JSONObject readValues(Context context) throws Exception {
         AtomicFile file = new AtomicFile(new File(context.getNoBackupFilesDir(), "workbench.enc"));
         if (!file.getBaseFile().exists()) return new JSONObject();
         JSONObject box = new JSONObject(new String(file.readFully(), StandardCharsets.UTF_8));
@@ -52,6 +52,7 @@ public class PrivateStoragePlugin extends Plugin {
     }
     @PluginMethod
     public synchronized void load(PluginCall call) {
+      synchronized(PrivateStoragePlugin.class) {
         try {
             if (!file().getBaseFile().exists()) {
                 JSObject result = new JSObject(); result.put("values", new JSObject());
@@ -68,9 +69,11 @@ public class PrivateStoragePlugin extends Plugin {
         } catch (Exception e) {
             call.reject("加密数据无法读取，请保留原应用并检查设备解锁状态");
         }
+      }
     }
     @PluginMethod
     public synchronized void save(PluginCall call) {
+      synchronized(PrivateStoragePlugin.class) {
         FileOutputStream stream = null;
         try {
             JSObject values = call.getObject("values");
@@ -83,12 +86,15 @@ public class PrivateStoragePlugin extends Plugin {
             envelope.put("data", Base64.encodeToString(encrypted, Base64.NO_WRAP));
             AtomicFile target = file();
             stream = target.startWrite();
-            stream.write(envelope.toString().getBytes(StandardCharsets.UTF_8));
+            byte[] expected=envelope.toString().getBytes(StandardCharsets.UTF_8);
+            stream.write(expected);
             target.finishWrite(stream); stream = null;
+            if(!java.util.Arrays.equals(expected,target.readFully()))throw new IllegalStateException("Atomic file commit failed");
             call.resolve();
         } catch (Exception e) {
             if (stream != null) file().failWrite(stream);
             call.reject("加密保存失败，请勿退出应用，先导出备份");
         }
+      }
     }
 }
