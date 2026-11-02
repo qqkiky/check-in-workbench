@@ -5,7 +5,7 @@
   "bundledWebRuntime": false,
   "android": {
     "allowMixedContent": false,
-    "captureInput": true,
+    "captureInput": false,
     "webContentsDebuggingEnabled": false
   },
   "server": {
