@@ -64,7 +64,7 @@ export function TimelineNoteModal({
       setContent('')
       setCategoryId(undefined)
     }
-  }, [open, editEntry, defaultStartTime])
+  }, [open, editEntry?.id, defaultStartTime])
 
   const minutes = diffMinutes(startTime, endTime)
 

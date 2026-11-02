@@ -16,14 +16,14 @@ export function AssistantSettings() {
       await saveAssistantConfig({url,token,enabled:true})
       setEnabled(true)
       const result=await syncAssistant()
-      showToast(`今日清单已同步，共 ${result.todayCount} 项未完成${result.deliveryError ? '；微信发送受限，请与助手互动后重试' : result.connected ? '' : '；微信尚未扫码连接'}`)
+      showToast(`微信清单已同步：今天 ${result.todayCount} 项未完成${result.deliveryError ? '；微信发送受限，请与助手互动后重试' : result.connected ? '' : '；微信尚未扫码连接'}`)
     }catch(error){showToast(error instanceof Error ? error.message : '连接失败，请重试')}
     finally{setBusy(false)}
   }
   return <>
     <button onClick={()=>setOpen(true)} className="w-full bg-white rounded-2xl shadow-card p-4 text-left">
       <span className="block text-sm font-medium">微信日程助手</span>
-      <span className="block text-xs text-gray-500 mt-1">{enabled?'已启用':'未连接'} · 日程同步与微信主动记账</span>
+      <span className="block text-xs text-gray-500 mt-1">{enabled?'已启用':'未连接'} · 同步当天清单和习惯，供微信早报使用</span>
     </button>
     <Modal open={open} onClose={()=>setOpen(false)} title="微信日程助手">
       <div className="space-y-4">
@@ -32,7 +32,7 @@ export function AssistantSettings() {
         <p className="text-xs text-gray-500">微信消息可能受会话有效期限制；手机后台同步也可能延迟。请在重要日程前检查系统日历。</p>
         <label className="block text-sm">你的助手服务地址<TextInput type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://你的助手.workers.dev" className="mt-1 w-full border rounded-xl p-3" autoCapitalize="none" autoCorrect="off" /></label>
         <label className="block text-sm">手机连接密钥<TextInput type="password" value={token} onChange={e=>setToken(e.target.value)} autoComplete="off" className="mt-1 w-full border rounded-xl p-3" /></label>
-        <button disabled={busy||!url||!token} onClick={connect} className="w-full bg-primary text-white rounded-xl p-3 disabled:opacity-40">{busy?'连接与同步中…':enabled?'立即同步':'同意上述处理并连接'}</button>
+        <button disabled={busy||!url||!token} onClick={connect} className="w-full bg-primary text-white rounded-xl p-3 disabled:opacity-40">{busy?'微信清单同步中…':enabled?'同步清单到微信助手':'同意上述处理并连接'}</button>
         {enabled&&<button className="w-full text-sm text-gray-600 py-2" onClick={async()=>{await saveAssistantConfig({url,token,enabled:false});setEnabled(false);showToast('手机同步已关闭，云端助手仍需单独解除连接')}}>关闭手机日程同步</button>}
         <p className="text-xs text-gray-500">连接密钥不会随备份导出。关闭同步不会删除云端已有日程。</p>
       </div>

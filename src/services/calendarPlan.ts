@@ -10,10 +10,13 @@ export interface CalendarEvent {
   description: string
   completed: boolean
   reminderEnabled: boolean
+  allDay?: boolean
+  singleOccurrence?: boolean
 }
 
 export function buildCalendarEvents(task: Task, records: CheckInRecord[], now = new Date()): CalendarEvent[] {
-  if (task.archivedAt || !task.scheduledTime) return []
+  const allDay=!!task.calendarAllDay&&!task.scheduledTime
+  if (task.archivedAt || (!task.scheduledTime&&!allDay)) return []
   const dates = new Set<string>()
   if (task.recurrence === 'none') {
     if (task.scheduledDate) dates.add(task.scheduledDate)
@@ -27,12 +30,12 @@ export function buildCalendarEvents(task: Task, records: CheckInRecord[], now = 
   }
   return [...dates].filter(date=>!task.excludedDates?.includes(date)).map(date => {
     const [year, month, day] = date.split('-').map(Number)
-    const [hour, minute] = task.scheduledTime!.split(':').map(Number)
-    const start = new Date(year, month - 1, day, hour, minute).getTime()
-    const completed = records.some(record => record.taskId === task.id && record.date === date)
+    const [hour, minute] = (task.scheduledTime||'00:00').split(':').map(Number)
+    const start = allDay?Date.UTC(year,month-1,day):new Date(year, month - 1, day, hour, minute).getTime()
+    const completed = records.some(record => record.taskId === task.id && (task.recurrence==='none'||record.date === date))
     return { taskId: `${task.id}@${date}`, title: task.title, startMillis: start,
-      endMillis: start + (task.duration && task.duration > 0 ? task.duration : 30) * 60000,
+      endMillis: start + (task.duration && task.duration > 0 ? task.duration : allDay?1440:30) * 60000,
       reminderLeadMin: task.reminderLead ?? 0, completed, reminderEnabled: !!task.reminderEnabled,
-      description: completed ? '已在打卡工作台完成' : '来自打卡工作台' }
+      singleOccurrence:task.recurrence==='none',...(allDay?{allDay:true}:{}),description: completed ? '已在打卡工作台完成' : '来自打卡工作台' }
   }).filter(event => Number.isFinite(event.startMillis))
 }

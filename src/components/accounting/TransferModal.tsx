@@ -111,7 +111,7 @@ export function TransferModal({
       setTime(dt.format(now, 'HH:mm'))
       setNote('')
     }
-  }, [open, initial, defaultFromAccountId, accounts])
+  }, [open, initial?.id, defaultFromAccountId])
 
   // 余额基线：编辑态需排除这笔转账自身，否则预览会重复计算
   const balances = useMemo(() => {

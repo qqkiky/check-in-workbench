@@ -181,7 +181,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // 同步到系统日历：满足提醒条件则 upsert，否则移除以免残留旧提醒
     const updated = next.find((t) => t.id === id)
     if (updated) {
-      if (!updated.archivedAt && updated.scheduledTime) {
+      if (!updated.archivedAt && (updated.scheduledTime||updated.calendarAllDay)) {
         void syncTaskToCalendar(updated, get().records)
       } else {
         void removeTaskFromCalendar(id)

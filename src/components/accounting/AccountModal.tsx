@@ -38,7 +38,7 @@ export function AccountModal({ open, onClose, initial, onSave, onDelete }: Props
       setEmoji('💵')
       setColor('#34C759')
     }
-  }, [open, initial])
+  }, [open, initial?.id])
 
   const valid = name.trim().length > 0
   const balNum = parseFloat(initialBalance) || 0

@@ -34,7 +34,7 @@ export function AcctCategoryModal({ open, onClose, initial, onSave, onDelete }: 
       setEmoji('🍜')
       setColor('#FF9500')
     }
-  }, [open, initial])
+  }, [open, initial?.id])
 
   const valid = name.trim().length > 0
 

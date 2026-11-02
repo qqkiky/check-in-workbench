@@ -50,6 +50,8 @@ public class AssistantCalendarWorker extends Worker {
                 for(int i=0;i<Math.min(tasks.length(),2000);i++){
                     JSONObject task=tasks.getJSONObject(i);
                     String id=task.getString("id"),date=task.getString("date"),time=task.getString("time"),status=task.getString("status");
+                    // Imported system-calendar rows are reconciled in place by the foreground bridge.
+                    if(id.startsWith("sys-"))continue;
                     // Foreground changes not yet pushed take precedence over an older cloud snapshot.
                     JSONObject metadata=versions.optJSONObject(id);
                     if(metadata!=null){

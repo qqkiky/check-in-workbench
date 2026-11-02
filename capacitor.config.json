@@ -3,6 +3,7 @@
   "appName": "期待",
   "webDir": "dist",
   "bundledWebRuntime": false,
+  "loggingBehavior": "none",
   "android": {
     "allowMixedContent": false,
     "captureInput": false,

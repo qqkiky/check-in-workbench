@@ -370,7 +370,7 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
           </div>
         )}
 
-        <div className="agenda-version pt-4 pb-2 text-center text-[10px] text-gray-300">打卡 v {APP_VERSION}</div>
+        <div className="agenda-version pt-4 pb-2 text-center text-[10px] text-gray-300">期待 v {APP_VERSION}</div>
       </div>
 
       {onOpenAgent && !compact && <div className="agenda-voice"><button onClick={onOpenAgent}><Icons.Mic size={17}/>对助手说</button></div>}

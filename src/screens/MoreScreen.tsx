@@ -18,6 +18,8 @@ import { APP_NAME } from '@/types'
 import { THEME_PRESETS } from '@/utils/theme'
 import { AssistantSettings } from '@/components/AssistantSettings'
 import { DeviceSyncSettings } from '@/components/DeviceSyncSettings'
+import { CalendarSourcesSettings } from '@/components/CalendarSourcesSettings'
+import { APP_VERSION } from '@/version'
 
 export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNotes?: () => void; onOpenList?: () => void; onNavigate?: (tab:'account'|'timeline'|'info') => void }) {
   const isNativeApp = Capacitor.isNativePlatform()
@@ -139,6 +141,7 @@ export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNote
     <div className="flex flex-col h-full">
       <header className="px-4 pt-3 pb-2 bg-[#F2F2F7]">
         <h1 className="text-2xl font-bold text-gray-900">更多</h1>
+        <p className="text-xs text-gray-400 mt-1">期待 · {APP_VERSION}</p>
       </header>
 
       <div className="flex-1 overflow-y-auto pb-24 px-3 space-y-3">
@@ -236,6 +239,7 @@ export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNote
 
         <AssistantSettings />
         {isNativeApp && <DeviceSyncSettings />}
+        {isNativeApp && <CalendarSourcesSettings />}
         {/* 网页版原有同步入口，APK 使用独立的数据同步。 */}
         {!isNativeApp && <>
         <button
@@ -317,16 +321,16 @@ export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNote
               try {
                 if (!await enableCalendarSync()) { showToast('未授予日历权限，尚未同步'); return }
                 const result = await syncCalendarWithCleanup()
-                showToast(`已同步 ${result.synced} 项，清理日历残留 ${result.removed} 项；期待中删除 ${result.deletedTasks} 项、取消习惯 ${result.cancelledOccurrences} 次`)
+                showToast(`小米日历已核对：导入 ${result.importedTasks} 项，更新 ${result.updatedTasks} 项，写入 ${result.synced} 项${result.removed||result.deletedTasks||result.cancelledOccurrences?`；清理日历 ${result.removed} 项，删除待办 ${result.deletedTasks} 项，取消习惯 ${result.cancelledOccurrences} 次`:''}`)
               } catch { showToast('日历同步失败，请检查权限后重试') }
             }}
             className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors"
           >
             <span className="shrink-0 text-primary"><Icons.Calendar size={16} /></span>
             <span className="flex-1">
-              <span className="block text-sm font-medium text-gray-900">同步到系统日历</span>
+              <span className="block text-sm font-medium text-gray-900">与小米日历同步</span>
               <span className="block text-[11px] text-gray-400">
-                双向同步删除与清理残留；习惯仅取消当天
+                同步手动新增和修改；微信清单请使用微信助手入口
               </span>
             </span>
             <Icons.ChevronRight size={14} className="text-gray-300" />
@@ -357,7 +361,7 @@ export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNote
             <li>任务增删改查 + 量化目标</li>
             <li>本地离线存储，数据私密</li>
           </ul>
-          <p className="text-xs text-gray-400">数据存储于本地浏览器/设备，不上传服务器。建议定期用「更多 → 导出数据」备份，防止换设备 / 清缓存导致数据丢失。</p>
+          <p className="text-xs text-gray-400">数据默认保存在本机。启用同步后，按对应同步设置处理数据。可通过「更多 → 导出数据」保留备份。</p>
         </div>
       </Modal>
 

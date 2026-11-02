@@ -34,7 +34,7 @@ export function CategoryFormModal({ open, categoryId, onClose, onSaved }: Props)
       setColor(CATEGORY_COLORS[Math.floor(Math.random() * CATEGORY_COLORS.length)])
       setIcon('star')
     }
-  }, [open, editing])
+  }, [open, categoryId])
 
   const handleSave = () => {
     if (!name.trim()) {

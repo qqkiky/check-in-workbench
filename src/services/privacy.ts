@@ -8,7 +8,7 @@ export function canExportKey(key: string): boolean {
 }
 
 const FIELDS: Record<string, string[]> = {
-  'wb.tasks.v1': ['id','title','categoryId','emoji','scheduledTime','scheduledDate','duration','recurrence','weekdays','monthDay','excludedDates','priority','reminderEnabled','reminderLead','target','unit','isQuick','createdAt','updatedAt','archivedAt'],
+  'wb.tasks.v1': ['id','title','categoryId','emoji','scheduledTime','scheduledDate','calendarAllDay','duration','recurrence','weekdays','monthDay','excludedDates','priority','reminderEnabled','reminderLead','target','unit','isQuick','createdAt','updatedAt','archivedAt'],
   'wb.records.v1': ['id','taskId','taskTitle','categoryId','date','startedAt','completedAt','durationSeconds','progress','progressTotal','isMakeup','makeupAt'],
   'wb.categories.v1': ['id','name','emoji','icon','color','timeRange','order'],
 }

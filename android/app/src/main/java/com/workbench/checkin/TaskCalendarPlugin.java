@@ -26,6 +26,9 @@ import java.util.concurrent.Executors;
 import org.json.JSONObject;
 import java.util.Set;
 import java.util.HashSet;
+import android.database.ContentObserver;
+import android.os.Handler;
+import android.os.Looper;
 
 /**
  * TaskCalendar —— 把工作台待办写入系统日历并设置提醒。
@@ -48,6 +51,19 @@ public class TaskCalendarPlugin extends Plugin {
     private static final String TAG = "TaskCalendarPlugin";
     private static final String SYNC_TAG = "checkin:";
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler changesHandler=new Handler(Looper.getMainLooper());
+    private ContentObserver observer;
+    private final Runnable changed=()->notifyListeners("calendarChanged",new JSObject());
+    private synchronized void observe() {
+        if(observer!=null)return;
+        ContentObserver next=new ContentObserver(changesHandler){@Override public void onChange(boolean selfChange){changesHandler.removeCallbacks(changed);changesHandler.postDelayed(changed,600);}};
+        getContext().getContentResolver().registerContentObserver(CalendarContract.CONTENT_URI,true,next);observer=next;
+    }
+    @Override protected void handleOnDestroy() {
+        changesHandler.removeCallbacks(changed);
+        if(observer!=null)getContext().getContentResolver().unregisterContentObserver(observer);
+        executor.shutdown();
+    }
     private static final int DEFAULT_EVENT_DURATION_MS = 30 * 60 * 1000; // 无时长时默认 30 分钟
 
     // -------------------------------------------------------------------------
@@ -84,7 +100,7 @@ public class TaskCalendarPlugin extends Plugin {
 
         runIO(() -> {
             try {
-                long eventId = upsertEvent(taskId, title, startMillis, endMillis, reminderLeadMin, description, completed, reminderEnabled);
+                long eventId = upsertEvent(taskId, title, startMillis, endMillis, reminderLeadMin, description, completed, reminderEnabled,Boolean.TRUE.equals(call.getBoolean("allDay",false)),Boolean.TRUE.equals(call.getBoolean("singleOccurrence",false)));
                 JSObject res = new JSObject();
                 res.put("ok", true);
                 res.put("eventId", eventId);
@@ -123,7 +139,7 @@ public class TaskCalendarPlugin extends Plugin {
                     if (end <= start) end = start + DEFAULT_EVENT_DURATION_MS;
                     int lead = t.optInt("reminderLeadMin", 0);
                     String desc = t.optString("description", "");
-                    long eventId = upsertEvent(taskId, title, start, end, lead, desc, t.optBoolean("completed", false), t.optBoolean("reminderEnabled", true));
+                    long eventId = upsertEvent(taskId, title, start, end, lead, desc, t.optBoolean("completed", false), t.optBoolean("reminderEnabled", true),t.optBoolean("allDay",false),t.optBoolean("singleOccurrence",false));
                     if(eventId<=0)continue;
                     com.getcapacitor.JSObject r = new com.getcapacitor.JSObject();
                     r.put("taskId", taskId);
@@ -185,10 +201,10 @@ public class TaskCalendarPlugin extends Plugin {
     }
 
     private long upsertEvent(String taskId, String title, long startMillis, long endMillis,
-            int lead, String description, boolean completed, boolean reminderEnabled) throws Exception {
+            int lead, String description, boolean completed, boolean reminderEnabled,boolean allDay,boolean singleOccurrence) throws Exception {
         synchronized (CalendarRepository.class) {
             CalendarRepository repository=new CalendarRepository(getContext());repository.allowTask(taskId);
-            return repository.upsertEvent(taskId, title, startMillis, endMillis, lead, description, completed, reminderEnabled);
+            return repository.upsertEvent(taskId, title, startMillis, endMillis, lead, description, completed, reminderEnabled,allDay,singleOccurrence);
         }
     }
     private int deleteEvent(String taskId) throws Exception {
@@ -206,13 +222,35 @@ public class TaskCalendarPlugin extends Plugin {
         runIO(()->{
             try {
                 synchronized(CalendarRepository.class){
+                    observe();
                     CalendarRepository repository=new CalendarRepository(getContext());
                     int removed=0;
-                    if(full){Set<String> active=new HashSet<>();for(int i=0;i<ids.length();i++)active.add(ids.getString(i));removed=repository.pruneTasks(active);}
-                    JSObject result=new JSObject();result.put("removed",removed);result.put("deletedKeys",repository.collectDeletions());call.resolve(result);
+                    Set<String> active=new HashSet<>();if(ids!=null)for(int i=0;i<ids.length();i++)active.add(ids.getString(i));
+                    if(full)removed=repository.pruneTasks(active);
+                    JSObject result=new JSObject();result.put("removed",removed);result.put("deletedKeys",repository.collectDeletions());result.put("changes",repository.collectChanges());result.put("newEvents",repository.collectNewEvents(active));call.resolve(result);
                 }
             }catch(Exception error){call.reject("日历删除核对失败："+error.getMessage());}
         });
+    }
+
+    @PluginMethod public void getCalendars(PluginCall call) {
+        if(!PermissionState.GRANTED.equals(getPermissionState("calendar"))){call.reject("请先授予日历权限");return;}
+        runIO(()->{try{synchronized(CalendarRepository.class){JSObject result=new JSObject();result.put("calendars",new CalendarRepository(getContext()).availableCalendars());call.resolve(result);}}
+            catch(Exception error){call.reject("读取来源日历失败："+error.getMessage());}});
+    }
+    @PluginMethod public void selectCalendars(PluginCall call) {
+        if(!PermissionState.GRANTED.equals(getPermissionState("calendar"))){call.reject("请先授予日历权限");return;}
+        runIO(()->{try{synchronized(CalendarRepository.class){com.getcapacitor.JSArray ids=call.getArray("ids");if(ids==null)throw new Exception("缺少来源日历");new CalendarRepository(getContext()).selectCalendars(ids);observe();call.resolve();}}
+            catch(Exception error){call.reject("保存来源日历失败："+error.getMessage());}});
+    }
+
+    @PluginMethod public void rebind(PluginCall call) {
+        if(!PermissionState.GRANTED.equals(getPermissionState("calendar"))){call.reject("日历权限未授予");return;}
+        runIO(()->{try{synchronized(CalendarRepository.class){
+            com.getcapacitor.JSArray bindings=call.getArray("bindings");if(bindings==null)throw new Exception("缺少映射列表");
+            for(int i=0;i<bindings.length();i++){JSONObject row=bindings.getJSONObject(i);new CalendarRepository(getContext()).rebind(row.getString("fromKey"),row.getString("toKey"),row.getLong("eventId"));}
+            call.resolve();
+        }}catch(Exception error){call.reject("日历修改确认失败："+error.getMessage());}});
     }
 
 }

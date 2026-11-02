@@ -60,7 +60,7 @@ export function TransactionModal({
       setTime(dt.format(now, 'HH:mm'))
       setNote('')
     }
-  }, [open, initial, defaultType, defaultAccountId, accounts])
+  }, [open, initial?.id, defaultType, defaultAccountId])
 
   const visibleCategories = useMemo(
     () => categories.filter((c) => c.type === type || c.type === 'both'),

@@ -18,6 +18,8 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Collections;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -82,29 +84,93 @@ public class CalendarRepositoryTest {
         assertEquals(0,repository.collectDeletions().length());assertEquals(id,repository.upsertEvent(key,"done",1000000,2000000,0,"",true,false));
         assertEquals("✅ 已完成｜done",provider.events.get(id).getAsString(Events.TITLE));assertFalse(provider.reminders.contains(id));
     }
+    @Test public void editsInCalendarAreReadBeforeAnAppWriteAndIdenticalWritesAreQuiet() throws Exception {
+        String key="one@2026-11-02";long id=add(key);
+        assertEquals(0,repository.collectChanges().length());assertEquals(id,add(key));assertEquals(0,provider.updates);
+        provider.events.get(id).put(Events.TITLE,"changed in calendar");
+        assertEquals("changed in calendar",repository.collectChanges().getJSONObject(0).getString("title"));
+        repository.upsertEvent(key,"changed in calendar",1000000,2000000,0,"",false,true);
+        assertEquals(0,repository.collectChanges().length());assertEquals(1,provider.updates);
+    }
+    @Test public void movingAnOccurrenceRebindsTheOriginalEventInsteadOfDuplicatingIt() throws Exception {
+        long id=add("one@2026-11-02");repository.rebind("one@2026-11-02","one@2026-11-03",id);
+        assertEquals(id,add("one@2026-11-03"));assertEquals(1,provider.inserts);
+        assertFalse(context.getSharedPreferences("calendar-events",0).contains("one@2026-11-02"));
+    }
+    @Test public void appReschedulingSingleTaskUpdatesItsOriginalRow() throws Exception {
+        long id=add("one@2026-11-02");
+        assertEquals(id,repository.upsertEvent("one@2026-11-03","moved",3000000,4000000,0,"",false,true,false,true));
+        assertEquals(1,provider.inserts);assertEquals(3000000L,provider.events.get(id).getAsLong(Events.DTSTART).longValue());
+    }
+    @Test public void selectedXiaoaiEventsImportInPlaceAndKeepOriginalCalendarAndNotes() throws Exception {
+        ContentValues source=new ContentValues();source.put(Events._ID,900L);source.put(Events.CALENDAR_ID,2L);source.put(Events.TITLE,"from xiaoai");source.put(Events.DESCRIPTION,"private calendar note");
+        long start=System.currentTimeMillis()+3600000;source.put(Events.DTSTART,start);source.put(Events.DTEND,start+1800000);source.put(Events.DELETED,0);source.put(Events.HAS_ALARM,0);provider.events.put(900L,source);
+        assertEquals(0,repository.collectNewEvents().length());repository.selectCalendars(new JSONArray("[2]"));
+        JSONObject incoming=repository.collectNewEvents().getJSONObject(0);String key=incoming.getString("key");
+        assertEquals("from xiaoai",incoming.getString("title"));assertEquals(0,repository.pruneTasks(Collections.emptySet()));assertTrue(provider.events.containsKey(900L));
+        assertFalse(incoming.has("description"));assertFalse(context.getSharedPreferences("calendar-snapshots",0).getString(key,"").contains("from xiaoai"));
+        repository.allowTask(key);
+        assertEquals(900L,repository.upsertEvent(key,"edited in app",start,start+1800000,0,"must not overwrite private notes",false,false,false,true));
+        assertEquals(2L,provider.events.get(900L).getAsLong(Events.CALENDAR_ID).longValue());assertEquals("private calendar note",provider.events.get(900L).getAsString(Events.DESCRIPTION));
+        assertEquals(0,repository.collectNewEvents().length());assertEquals(0,provider.inserts);
+        provider.events.get(900L).put(Events.TITLE,"edited in calendar");assertEquals("edited in calendar",repository.collectChanges().getJSONObject(0).getString("title"));
+        repository.selectCalendars(new JSONArray());assertEquals(0,repository.upsertEvent(key,"must not write deselected calendar",start,start+1800000,0,"",false,false));
+        assertEquals("edited in calendar",provider.events.get(900L).getAsString(Events.TITLE));
+    }
+    @Test public void repeatAndPastEventsStayOutsideTheSingleEventImport() throws Exception {
+        repository.selectCalendars(new JSONArray("[2]"));
+        ContentValues repeat=new ContentValues();repeat.put(Events._ID,900L);repeat.put(Events.CALENDAR_ID,2L);repeat.put(Events.TITLE,"repeat");repeat.put(Events.DTSTART,System.currentTimeMillis()+3600000);repeat.put(Events.DTEND,System.currentTimeMillis()+7200000);repeat.put(Events.RRULE,"FREQ=DAILY");provider.events.put(900L,repeat);
+        ContentValues past=new ContentValues(repeat);past.put(Events._ID,901L);past.remove(Events.RRULE);past.put(Events.DTSTART,1000L);past.put(Events.DTEND,2000L);provider.events.put(901L,past);
+        assertEquals(0,repository.collectNewEvents().length());
+    }
+    @Test public void lostOwnMappingRestoresItsTaskKeyWithoutImportingADuplicate() throws Exception {
+        long start=System.currentTimeMillis()+3600000;
+        long id=repository.upsertEvent("one@2026-11-02","own",start,start+1800000,0,"来自打卡工作台",false,false);
+        context.getSharedPreferences("calendar-events",0).edit().clear().commit();
+        assertEquals(0,repository.collectNewEvents(Collections.singleton("one")).length());
+        assertEquals(id,context.getSharedPreferences("calendar-events",0).getLong("one@2026-11-02",-1));
+        assertEquals(1,provider.inserts);
+    }
 
     public static class FakeCalendar extends ContentProvider {
-        final Map<Long,ContentValues> events=new HashMap<>();final Set<Long> reminders=new HashSet<>();
-        boolean calendarExists=true,visible=true,failQueries;long next=100;int inserts;
+        final Map<Long,ContentValues> events=new HashMap<>();final Set<Long> reminders=new HashSet<>();final Map<Long,Integer> reminderMinutes=new HashMap<>();
+        boolean calendarExists=true,sourceExists=true,visible=true,failQueries;long next=100;int inserts,updates;
         @Override public boolean onCreate(){return true;}
         @Override public Cursor query(Uri uri,String[] projection,String selection,String[] args,String order) {
             if(failQueries)return null;
             MatrixCursor result=new MatrixCursor(projection);
             if(uri.getPath().startsWith("/calendars")){
                 if(!visible&&selection!=null&&selection.contains(Calendars.VISIBLE))return result;
-                if(calendarExists){Object[] row=new Object[projection.length];for(int i=0;i<projection.length;i++){String column=projection[i];row[i]=column.equals(Calendars._ID)?1L:column.equals(Calendars.ACCOUNT_NAME)?"打卡工作台":CalendarContract.ACCOUNT_TYPE_LOCAL;}result.addRow(row);}
+                for(long id:new long[]{1,2}){
+                    if(id==1&&!calendarExists||id==2&&!sourceExists)continue;
+                    if(selection!=null&&selection.contains(Calendars.ACCOUNT_NAME)&&id!=1)continue;
+                    if((Calendars._ID+"=?").equals(selection)&&id!=Long.parseLong(args[0]))continue;
+                    Object[] row=new Object[projection.length];for(int i=0;i<projection.length;i++){
+                        String column=projection[i];row[i]=column.equals(Calendars._ID)?id:column.equals(Calendars.ACCOUNT_NAME)?(id==1?"打卡工作台":"local"):column.equals(Calendars.CALENDAR_ACCESS_LEVEL)?Calendars.CAL_ACCESS_OWNER:column.equals(Calendars.CALENDAR_DISPLAY_NAME)?(id==1?"期待":"手机日历"):CalendarContract.ACCOUNT_TYPE_LOCAL;
+                    }result.addRow(row);
+                }
             }else if(uri.getPath().startsWith("/events")){
-                ContentValues value=events.get(Long.parseLong(args[0]));
-                if(value!=null){Object[] row=new Object[projection.length];for(int i=0;i<projection.length;i++)row[i]=value.get(projection[i]);result.addRow(row);}
+                java.util.Collection<ContentValues> rows;
+                if((Events._ID+"=?").equals(selection)){ContentValues value=events.get(Long.parseLong(args[0]));rows=value==null?Collections.emptyList():Collections.singletonList(value);}
+                else rows=events.values();
+                for(ContentValues value:rows){
+                    if(selection!=null&&selection.contains(" IN ")){
+                        if(!java.util.Arrays.asList(args).contains(value.getAsString(Events.CALENDAR_ID))||Integer.valueOf(1).equals(value.getAsInteger(Events.DELETED)))continue;
+                        String repeat=value.getAsString(Events.RRULE);if(repeat!=null&&!repeat.isEmpty())continue;
+                    }
+                    Object[] row=new Object[projection.length];for(int i=0;i<projection.length;i++)row[i]=value.get(projection[i]);result.addRow(row);
+                }
+            }else if(uri.getPath().startsWith("/reminders")){
+                long id=Long.parseLong(args[0]);if(reminders.contains(id))result.addRow(new Object[]{reminderMinutes.getOrDefault(id,0)});
             }
             return result;
         }
         @Override public Uri insert(Uri uri,ContentValues values) {
             if(uri.getPath().startsWith("/calendars")){calendarExists=true;return ContentUris.withAppendedId(Calendars.CONTENT_URI,1);}
-            if(uri.getPath().startsWith("/reminders")){reminders.add(values.getAsLong(Reminders.EVENT_ID));return ContentUris.withAppendedId(Reminders.CONTENT_URI,1);}
+            if(uri.getPath().startsWith("/reminders")){long id=values.getAsLong(Reminders.EVENT_ID);reminders.add(id);reminderMinutes.put(id,values.getAsInteger(Reminders.MINUTES));return ContentUris.withAppendedId(Reminders.CONTENT_URI,1);}
             long id=next++;ContentValues value=new ContentValues(values);value.put(Events._ID,id);value.put(Events.DELETED,0);events.put(id,value);inserts++;return ContentUris.withAppendedId(Events.CONTENT_URI,id);
         }
-        @Override public int update(Uri uri,ContentValues values,String selection,String[] args) {ContentValues value=events.get(Long.parseLong(args[0]));if(value==null)return 0;value.putAll(values);return 1;}
+        @Override public int update(Uri uri,ContentValues values,String selection,String[] args) {ContentValues value=events.get(Long.parseLong(args[0]));if(value==null)return 0;value.putAll(values);updates++;return 1;}
         @Override public int delete(Uri uri,String selection,String[] args) {long id=Long.parseLong(args[0]);return uri.getPath().startsWith("/reminders")?(reminders.remove(id)?1:0):(events.remove(id)!=null?1:0);}
         @Override public String getType(Uri uri){return null;}
     }

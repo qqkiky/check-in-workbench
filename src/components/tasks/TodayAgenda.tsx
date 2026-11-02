@@ -16,7 +16,7 @@ export function TodayAgenda({agenda,categories,compact,onCheckIn,onEdit,onAdd}:{
     const completionLabel=record?`${fmtDate(new Date(record.completedAt))!==dateKey?fmtDate(new Date(record.completedAt)).slice(5)+' ':''}${new Date(record.completedAt).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})}`:''
     return <div key={`${task.id}@${dateKey}`} data-task-id={task.id} data-occurrence={dateKey} className={`agenda-task ${overdue?'is-overdue':next?'is-next':''} ${record?'is-done':''}`} style={{backgroundColor:habitBackground(task,category?.color)}}>
       <button type="button" onClick={()=>onEdit(task.id)} className="agenda-task-content" aria-label={`编辑任务：${task.title}`}>
-        <span className="agenda-task-time">{overdue&&compact?'逾期':task.scheduledTime||'时间待定'}</span>
+        <span className="agenda-task-time">{overdue&&compact?'逾期':task.scheduledTime||(task.calendarAllDay?'全天':'时间待定')}</span>
         <span className="min-w-0 flex-1">
           <span className="agenda-task-title">{task.title}</span>
           {!compact&&<span className="agenda-task-meta">{record?`完成于 ${completionLabel}`:[recurrence,category?.name].filter(Boolean).join(' · ')||'临时事项'}{!record&&task.target?` · 目标 ${task.target}${task.unit||''}`:''}</span>}

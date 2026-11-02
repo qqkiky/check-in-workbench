@@ -1,7 +1,15 @@
 import { initPrivateStorage } from './services/appStorage'
+import { Capacitor } from '@capacitor/core'
 
 // Initialize encrypted native state before evaluating any store module.
-initPrivateStorage().then(() => import('./renderApp')).catch(() => {
+async function boot() {
+  if(Capacitor.isNativePlatform()&&'serviceWorker' in navigator) {
+    try {const registrations=await navigator.serviceWorker.getRegistrations();await Promise.allSettled(registrations.filter(registration=>new URL(registration.scope).origin===location.origin).map(registration=>registration.unregister()))}catch{/* Bundled APK assets work without a service worker. */}
+  }
+  await initPrivateStorage()
+  await import('./renderApp')
+}
+boot().catch(() => {
   const root = document.getElementById('root')
   if (root) root.textContent = '加密数据读取失败。请勿卸载或清除数据，解锁手机后重试。'
 })

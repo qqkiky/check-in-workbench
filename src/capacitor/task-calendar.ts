@@ -13,6 +13,8 @@ import type { Task, CheckInRecord } from '@/types'
 import { appStorage, flushPrivateStorage } from '@/services/appStorage'
 import { buildCalendarEvents } from '@/services/calendarPlan'
 import { useStore } from '@/store'
+import { planCalendarUpdates, type CalendarUpdate } from '@/services/calendarUpdates'
+import { storage } from '@/services/storage'
 
 interface TaskCalendarPlugin {
   syncTask(opts: {
@@ -25,7 +27,11 @@ interface TaskCalendarPlugin {
   }): Promise<{ ok: boolean; eventId: number }>
   syncAll(opts: { tasks: any[] }): Promise<{ ok: boolean; synced: number }>
   removeTask(opts: { taskId: string }): Promise<{ ok: boolean; removed: number }>
-  reconcile(opts:{fullSnapshot:boolean;activeTaskIds:string[]}):Promise<{removed:number;deletedKeys:string[]}>
+  reconcile(opts:{fullSnapshot:boolean;activeTaskIds:string[]}):Promise<{removed:number;deletedKeys:string[];changes?:CalendarUpdate[];newEvents?:CalendarUpdate[]}>
+  getCalendars():Promise<{calendars:CalendarSource[]}>
+  selectCalendars(opts:{ids:number[]}):Promise<void>
+  rebind(opts:{bindings:{fromKey:string;toKey:string;eventId:number}[]}):Promise<void>
+  addListener(event:'calendarChanged',callback:()=>void):Promise<{remove:()=>Promise<void>}>
   checkPermissions(): Promise<{ calendar: string }>
   requestPermissions(): Promise<{ calendar: string }>
 }
@@ -33,7 +39,8 @@ interface TaskCalendarPlugin {
 const TaskCalendar = registerPlugin<TaskCalendarPlugin>('TaskCalendar')
 const isNative = Capacitor.getPlatform() !== 'web'
 const ENABLED_KEY = 'wb.calendar.enabled.v1'
-export interface CalendarSyncReport { synced:number;removed:number;deletedTasks:number;cancelledOccurrences:number }
+export interface CalendarSyncReport { synced:number;removed:number;deletedTasks:number;cancelledOccurrences:number;importedTasks:number;updatedTasks:number }
+export interface CalendarSource {id:number;name:string;account:string;selected:boolean}
 let queue:Promise<unknown>=Promise.resolve()
 function serial<T>(run:()=>Promise<T>):Promise<T> {
   const result=queue.catch(()=>{}).then(run)
@@ -99,22 +106,43 @@ export async function syncTasksToCalendar(_tasks: Task[], _records: CheckInRecor
 }
 
 export function syncCalendarWithCleanup():Promise<CalendarSyncReport> { return performSync(null,true) }
+export async function getCalendarSources() {
+  if(!await ensureCalendarPermission())throw new Error('请先授予日历权限')
+  return (await TaskCalendar.getCalendars()).calendars
+}
+export async function setCalendarSources(ids:number[]) {
+  if(!await enableCalendarSync())throw new Error('请先授予日历权限')
+  await TaskCalendar.selectCalendars({ids})
+  return syncCalendarWithCleanup()
+}
+
+export function watchCalendarChanges(callback:()=>void) {
+  if(!isNative)return ()=>{}
+  let disposed=false,handle:{remove:()=>Promise<void>}|undefined
+  void TaskCalendar.addListener('calendarChanged',callback).then(value=>{if(disposed)void value.remove();else handle=value}).catch(()=>{})
+  return ()=>{disposed=true;void handle?.remove()}
+}
 
 function performSync(requested:Set<string>|null,fullSnapshot:boolean):Promise<CalendarSyncReport> {
   return serial(async()=>{
-    const report={synced:0,removed:0,deletedTasks:0,cancelledOccurrences:0}
+    const report={synced:0,removed:0,deletedTasks:0,cancelledOccurrences:0,importedTasks:0,updatedTasks:0}
     if(!isNative||!isCalendarSyncEnabled())return report
     if(!useStore.getState().initialized)throw new Error('本机数据尚未加载，未处理日历删除')
     await flushPrivateStorage()
     if((await TaskCalendar.checkPermissions()).calendar!=='granted')throw new Error('请重新授予日历权限')
     const state=useStore.getState()
-    const result=await TaskCalendar.reconcile({fullSnapshot,activeTaskIds:state.tasks.filter(task=>!task.archivedAt&&task.scheduledTime).map(task=>task.id)})
+    const result=await TaskCalendar.reconcile({fullSnapshot,activeTaskIds:state.tasks.filter(task=>!task.archivedAt&&(task.scheduledTime||task.calendarAllDay)).map(task=>task.id)})
     if(!Array.isArray(result.deletedKeys)||result.deletedKeys.some(key=>typeof key!=='string'))throw new Error('日历删除核对结果无效，未改变本机任务')
     report.removed=result.removed
     Object.assign(report,useStore.getState().applyCalendarDeletions(result.deletedKeys))
+    const current=useStore.getState()
+    const updates=planCalendarUpdates(current.tasks,current.records,[...(result.changes||[]),...(result.newEvents||[])],requested||new Set())
+    report.importedTasks=updates.imported;report.updatedTasks=updates.changed-updates.imported
+    if(updates.changed){storage.setTasks(updates.tasks);storage.setRecords(updates.records);await flushPrivateStorage();current.reload()}
+    if(updates.rebindings.length)await TaskCalendar.rebind({bindings:updates.rebindings})
     await flushPrivateStorage()
     const latest=useStore.getState(),tasks=requested?latest.tasks.filter(task=>requested.has(task.id)):latest.tasks
-    for(const task of tasks.filter(task=>task.archivedAt||!task.scheduledTime))await TaskCalendar.removeTask({taskId:task.id})
+    for(const task of tasks.filter(task=>task.archivedAt||(!task.scheduledTime&&!task.calendarAllDay)))await TaskCalendar.removeTask({taskId:task.id})
     const events=tasks.flatMap(task=>buildCalendarEvents(task,latest.records))
     if(events.length)report.synced=(await TaskCalendar.syncAll({tasks:events})).synced
     return report

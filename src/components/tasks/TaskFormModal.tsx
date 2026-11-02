@@ -93,7 +93,7 @@ export function TaskFormModal({ open, taskId, defaultCategoryId, defaultSchedule
       setReminderEnabled(true)
       setReminderLead(0)
     }
-  }, [open, editing, defaultCategoryId, defaultScheduledDate])
+  }, [open, taskId, defaultCategoryId, defaultScheduledDate])
 
   const toggleWeekday = (v: number) => {
     setWeekdays((prev) =>

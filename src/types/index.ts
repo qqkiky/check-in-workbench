@@ -34,6 +34,7 @@ export interface Task {
   // 计划
   scheduledTime?: string  // HH:mm 计划开始时间
   scheduledDate?: string  // YYYY-MM-DD 计划日期
+  calendarAllDay?: boolean // 从系统日历导入的全天事项
   duration?: number       // 计划分钟数
   recurrence: Recurrence  // 重复方式：不重复 / 每日 / 每周 / 每月
   weekdays?: number[]     // 每周重复日 [0-6]，recurrence==='weekly' 时生效

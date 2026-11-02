@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 async function fixture(tasks=[]){
- const f={state:{tasks,records:[],initialized:true},permission:'granted',calls:[],deleted:[],removed:0};globalThis.calendarSyncTest=f;
- f.native={checkPermissions:async()=>({calendar:f.permission}),reconcile:async options=>{f.calls.push(['reconcile',options]);if(f.nativeFailure)throw Error('provider unavailable');return {removed:f.removed,deletedKeys:f.deleted}},syncAll:async options=>{f.calls.push(['upsert',options]);return {synced:options.tasks.length}},removeTask:async options=>{f.calls.push(['remove',options]);return {removed:1}}};
+ const f={state:{tasks,records:[],initialized:true},savedTasks:tasks,savedRecords:[],permission:'granted',calls:[],deleted:[],changes:[],newEvents:[],removed:0};globalThis.calendarSyncTest=f;
+ f.state.reload=()=>{f.state.tasks=f.savedTasks;f.state.records=f.savedRecords};
+ f.native={checkPermissions:async()=>({calendar:f.permission}),reconcile:async options=>{f.calls.push(['reconcile',options]);if(f.nativeFailure)throw Error('provider unavailable');return {removed:f.removed,deletedKeys:f.deleted,changes:f.changes,newEvents:f.newEvents}},rebind:async options=>{f.calls.push(['rebind',options])},syncAll:async options=>{f.calls.push(['upsert',options]);return {synced:options.tasks.length}},removeTask:async options=>{f.calls.push(['remove',options]);return {removed:1}}};
  const modules={
-  '@capacitor/core':`export const Capacitor={getPlatform:()=> 'android'};export const registerPlugin=()=>Object.fromEntries(['checkPermissions','reconcile','syncAll','removeTask'].map(key=>[key,(...args)=>globalThis.calendarSyncTest.native[key](...args)]));`,
+  '@capacitor/core':`export const Capacitor={getPlatform:()=> 'android'};export const registerPlugin=()=>Object.fromEntries(['checkPermissions','reconcile','rebind','syncAll','removeTask'].map(key=>[key,(...args)=>globalThis.calendarSyncTest.native[key](...args)]));`,
+  '@/services/storage':`export const storage={setTasks:tasks=>globalThis.calendarSyncTest.savedTasks=tasks,setRecords:records=>globalThis.calendarSyncTest.savedRecords=records};`,
   '@/store':`export const useStore={getState:()=>globalThis.calendarSyncTest.state};`,
   '@/services/appStorage':`export const appStorage={getItem:()=> '1'};export const flushPrivateStorage=async()=>{if(globalThis.calendarSyncTest.diskFailure)throw Error('disk error')};`,
  };
@@ -33,4 +35,12 @@ test('permission, provider and uninitialized-state failures never become task de
  const {f,service:s}=await fixture([task('one')]);f.deleted=['one@2026-11-02'];f.permission='denied';await assert.rejects(s.syncCalendarWithCleanup(),/权限/);assert.equal(f.state.tasks.length,1);
  f.permission='granted';f.nativeFailure=true;await assert.rejects(s.syncCalendarWithCleanup(),/unavailable/);assert.equal(f.state.tasks.length,1);
  f.nativeFailure=false;f.state.initialized=false;await assert.rejects(s.syncCalendarWithCleanup(),/加载/);assert.equal(f.state.tasks.length,1);
+});
+test('new selected-calendar events are saved before writing back and replay never duplicates tasks',async()=>{
+ const {f,service:s}=await fixture();
+ f.newEvents=[{key:'sys-test-100@2026-11-02',eventId:100,title:'小爱新增事项',startMillis:new Date('2026-11-02T15:00:00').getTime(),endMillis:new Date('2026-11-02T15:30:00').getTime(),isNew:true}];
+ await s.syncCalendarWithCleanup();assert.equal(f.state.tasks.length,1);assert.equal(f.savedTasks[0].title,'小爱新增事项');assert.equal(f.calls.at(-1)[1].tasks[0].taskId,'sys-test-100@2026-11-02');
+ await s.syncCalendarWithCleanup();assert.equal(f.state.tasks.length,1);
+ f.newEvents=[];f.changes=[{...f.state.tasks[0],key:'sys-test-100@2026-11-02',eventId:100,title:'在日历中改名',startMillis:new Date('2026-11-03T16:00:00').getTime(),endMillis:new Date('2026-11-03T16:30:00').getTime()}];
+ await s.syncCalendarWithCleanup();assert.equal(f.state.tasks[0].title,'在日历中改名');assert.equal(f.state.tasks[0].scheduledDate,'2026-11-03');assert.ok(f.calls.some(([name])=>name==='rebind'));
 });

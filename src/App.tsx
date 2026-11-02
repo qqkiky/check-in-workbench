@@ -15,7 +15,7 @@ import { haptic } from './utils/capacitor'
 import { applyThemeColor, DEFAULT_THEME } from './utils/theme'
 import { initSyncManager } from './utils/syncManager'
 import { pullOnly } from './services/cloudSync'
-import { syncTasksToCalendar } from './capacitor/task-calendar'
+import { syncTasksToCalendar, watchCalendarChanges } from './capacitor/task-calendar'
 import { Icons } from './components/common/Icons'
 import { initAssistantSync } from './services/assistant'
 import { AgentScreen } from './screens/AgentScreen'
@@ -95,7 +95,8 @@ export default function App() {
     sync()
     document.addEventListener('visibilitychange',visible)
     window.addEventListener('focus',sync)
-    return () => {clearTimeout(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',sync)}
+    const unwatch=watchCalendarChanges(sync)
+    return () => {unwatch();clearTimeout(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',sync)}
   }, [])
 
   useEffect(() => {
