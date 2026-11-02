@@ -15,9 +15,9 @@ export function buildTodayAgenda(tasks:Task[],records:CheckInRecord[],viewDate:D
     const due=task.scheduledDate
     const scheduled=task.isQuick?!due||due===day:taskOccursOnDate(task,viewDate)
     const carry=isToday&&single&&!record&&!!due&&due<day
-    const completedToday=isToday&&single&&record&&fmtDate(new Date(record.completedAt))===day
-    if(!scheduled&&!carry&&!completedToday)continue
-    if(single&&record&&record.date!==day&&!completedToday)continue
+    const completedOnDay=single&&record&&fmtDate(new Date(record.completedAt))===day
+    if(!scheduled&&!carry&&!completedOnDay)continue
+    if(record&&fmtDate(new Date(record.completedAt))!==day)continue
     if(task.isQuick&&!due&&!isToday&&fmtDate(new Date(task.createdAt))>day)continue
     const dateKey=record?.date||(single&&due?due:day)
     const overdue=!record&&!!task.scheduledTime&&new Date(`${dateKey}T${task.scheduledTime}:00`).getTime()<now.getTime()

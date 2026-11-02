@@ -30,6 +30,13 @@ test('real Worker runtime encrypts schedules, isolates roles and rejects stale w
     const value=await get.json();assert.equal(value.tasks[0].title,'PrivateTaskTitle');assert.equal(value.tasks[0].note,undefined);
     const noAuth=await mf.dispatchFetch('https://test.workers.dev/v1/schedules');assert.equal(noAuth.status,401);
     const admin=await mf.dispatchFetch('https://test.workers.dev/admin/erase',{method:'POST',headers,body:'{}'});assert.equal(admin.status,401);
+    const agendaTask={id:'routine',title:'PrivateHabitTitle',date:'',time:'09:00',createdDate:'2026-10-01',recurrence:'daily',weekdays:[],monthDay:0,excludedDates:[],completedDates:[],completed:false,note:'DO_NOT_STORE_AGENDA_NOTE'};
+    const upload=baseVersion=>mf.dispatchFetch('https://test.workers.dev/v1/agenda',{method:'POST',headers,body:JSON.stringify({baseVersion,tasks:[agendaTask],transactions:[{note:'DO_NOT_STORE_AGENDA_LEDGER'}]})});
+    assert.equal((await mf.dispatchFetch('https://test.workers.dev/v1/agenda',{method:'POST',body:'{}'})).status,401);
+    assert.equal((await (await upload(0)).json()).version,1);
+    assert.equal((await (await upload(0)).json()).version,1); // Lost replies retry without duplicate snapshots.
+    agendaTask.title='UpdatedHabitTitle';assert.equal((await upload(0)).status,409);
+    assert.equal((await (await upload(1)).json()).version,2);
     // Seed an incoming WeChat bill into encrypted state, then exercise the actual phone API.
     const saved=await db.prepare('SELECT ciphertext FROM assistant_state WHERE id=1').first();
     const key=await crypto.subtle.importKey('raw',Buffer.alloc(32,7),'AES-GCM',false,['encrypt','decrypt']);
@@ -50,5 +57,8 @@ test('real Worker runtime encrypts schedules, isolates roles and rejects stale w
     const plain=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(afterBox.iv,'base64')},key,Buffer.from(afterBox.data,'base64')));
     assert.ok(!plain.includes('MUST_NOT_BE_STORED'));
     assert.ok(!plain.includes('amountCents'));
+    assert.equal(JSON.parse(plain).agenda.tasks[0].title,'UpdatedHabitTitle');
+    assert.ok(!plain.includes('DO_NOT_STORE_AGENDA'));
+    assert.ok(!after.ciphertext.includes('UpdatedHabitTitle'));
   }finally{await mf.dispose();}
 });

@@ -1,6 +1,7 @@
 import { safeTask, cstDay, applyActions, ruleActions } from './domain.mjs';
 import { bookkeepingInput, applyBookkeeping, expireBookkeeping, receiveBookkeeping } from './bookkeeping.mjs';
 import { activeDraft, activeFocus, followupActions, rememberFocus, cleanInterpretation, cleanDraft } from './conversation.mjs';
+import { safeAgenda, dailyPending, agendaLines } from './dailyAgenda.mjs';
 
 const BASE = 'https://ilinkai.weixin.qq.com';
 const encoder = new TextEncoder();
@@ -132,6 +133,10 @@ async function poll(env) {
       await mutate(env,s => {
         if (s.seen.includes(id)) return;
         const result = finance ? { tasks: s.tasks, reply: applyBookkeeping(s,finance,id) } : applyActions(s.tasks,parsed.actions,Date.now(),id);
+        if(!finance&&parsed.actions.length===1&&parsed.actions[0].type==='list') {
+          const day=parsed.actions[0].date||cstDay(),rows=dailyPending(result.tasks,s.agenda?.tasks||[],day);
+          result.reply=rows.length?`${day} 的未完成安排（${rows.length}项）：\n${agendaLines(rows)}`:`${day} 还没有未完成日程。`;
+        }
         if(finance || parsed.actions.some(action=>action.type==='list') || parsed.draft)delete s.scheduleFocus;
         else rememberFocus(s,s.tasks,result.tasks);
         if(parsed && parsed.draft!==undefined){if(parsed.draft)s.scheduleDraft=parsed.draft;else delete s.scheduleDraft;}
@@ -172,8 +177,8 @@ async function scheduleReminders(env) {
     if(!activeFocus(s,now))delete s.scheduleFocus;
     const pending=s.tasks.filter(task=>task.status==='pending');
     if (clock >= s.settings.morningTime && clock < '12:00' && s.lastDigest !== day) {
-      const today=pending.filter(task=>task.date===day).sort((a,b)=>a.time.localeCompare(b.time));
-      if (today.length) enqueue(s,`早上好，今天有 ${today.length} 项安排：\n${today.map(t=>`${t.time} ${t.title}`).join('\n')}`,`digest-${day}`);
+      const today=dailyPending(s.tasks,s.agenda?.tasks||[],day);
+      if (today.length) enqueue(s,`早上好，今天有 ${today.length} 项待办：\n${agendaLines(today)}`,`digest-${day}`);
       s.lastDigest=day;
     }
     if (clock >= s.settings.quietStart || clock < s.settings.quietEnd) return;
@@ -218,10 +223,21 @@ export default {
         return respond({tasks:state.tasks.map(t=>({...safeTask(t),version:t.version,updatedAt:t.updatedAt})),deliveryError:!!state.deliveryError,connected:!!state.botToken});
       }
       if (request.method==='POST') {
-        const maxBytes=url.pathname==='/v1/data-sync'?750000:32768;
+        const maxBytes=['/v1/data-sync','/v1/agenda'].includes(url.pathname)?750000:32768;
         if (Number(request.headers.get('Content-Length') || 0)>maxBytes) return respond({error:'too_large'},413);
         const raw=await request.text(); if(encoder.encode(raw).length>maxBytes)return respond({error:'too_large'},413);
         const body=JSON.parse(raw || '{}');
+        if(url.pathname==='/v1/agenda') {
+          if(!Number.isSafeInteger(body.baseVersion)||body.baseVersion<0)return respond({error:'invalid_version'},400);
+          const tasks=safeAgenda(body.tasks);
+          const result=await mutate(env,s=>{
+            const current=s.agenda||{version:0,tasks:[]};
+            if(JSON.stringify(current.tasks)===JSON.stringify(tasks))return {version:current.version};
+            if(body.baseVersion!==current.version)return {error:'agenda_conflict'};
+            s.agenda={version:current.version+1,tasks};return {version:s.agenda.version};
+          });
+          return respond(result,result.error?409:200);
+        }
         if(devicePairing) {
           if(typeof body.code!=='string'||!/^\d{8}$/.test(body.code))return respond({error:'invalid_pairing_code'},400);
           const hash=b64(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(body.code))));

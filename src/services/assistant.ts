@@ -5,10 +5,14 @@ import { useStore } from '@/store'
 import type { Task, CheckInRecord } from '@/types'
 import { syncTasksToCalendar } from '@/capacitor/task-calendar'
 import { inboxTransaction, type BookkeepingItem } from './bookkeepingInbox'
+import { assistantAgenda } from './assistantAgenda'
+import { dailyPending } from '../../assistant/src/dailyAgenda.mjs'
+import { fmtDate } from '@/utils/date'
 
 const CONFIG_KEY = 'wb.assistant.connection.v1'
 const META_KEY = 'wb.assistant.versions.v1'
 const BOOKKEEPING_RECEIPTS = 'wb.assistant.bookkeeping.receipts.v1'
+const AGENDA_META = 'wb.assistant.agenda.v1'
 const NativeAssistant = registerPlugin<{ configure(options: { enabled: boolean }): Promise<void> }>('AssistantBackground')
 export interface AssistantConfig { url: string; token: string; enabled: boolean }
 export interface SharedSchedule {
@@ -54,6 +58,7 @@ async function request(config: AssistantConfig, path: string, data?: unknown) {
     body: data === undefined ? undefined : JSON.stringify(data),
     signal: AbortSignal.timeout(15000), redirect: 'error', cache: 'no-store',
   })
+  if(response.status===409&&path==='/v1/agenda')throw new Error('微信当天清单在其他设备有变化，请先合并设备数据后再同步')
   if (!response.ok) throw new Error(`助手连接失败（${response.status}）`)
   return response.json()
 }
@@ -84,6 +89,17 @@ export async function syncBookkeeping(config: AssistantConfig) {
 }
 
 let busy = false
+export async function syncAssistantAgenda(config:AssistantConfig) {
+  const state=useStore.getState()
+  if(!state.initialized)throw new Error('本机数据尚未读取完成，请稍后同步')
+  const tasks=assistantAgenda(state.tasks,state.records),fingerprint=JSON.stringify(tasks)
+  const previous=JSON.parse(appStorage.getItem(AGENDA_META)||'null')
+  if(previous?.fingerprint===fingerprint)return
+  const result=await request(config,'/v1/agenda',{tasks,baseVersion:previous?.version||0})
+  appStorage.setItem(AGENDA_META,JSON.stringify({version:result.version,fingerprint}))
+  await flushPrivateStorage()
+}
+
 export function lockAssistantForDataSync() {
   if(busy)throw new Error('微信日程正在同步，请稍后再进行全量数据同步')
   busy=true
@@ -147,7 +163,10 @@ export async function syncAssistant() {
     latest.reload()
     await syncBookkeeping(config)
     await syncTasksToCalendar(tasks,records)
-    return { count:remote.tasks.length as number, deliveryError:!!remote.deliveryError, connected:!!remote.connected }
+    await syncAssistantAgenda(config)
+    const current=useStore.getState()
+    const todayCount=dailyPending(remote.tasks,assistantAgenda(current.tasks,current.records),fmtDate(new Date())).length
+    return { count:remote.tasks.length as number, todayCount, deliveryError:!!remote.deliveryError, connected:!!remote.connected }
   } finally { busy=false }
 }
 

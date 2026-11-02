@@ -16,7 +16,7 @@ export function AssistantSettings() {
       await saveAssistantConfig({url,token,enabled:true})
       setEnabled(true)
       const result=await syncAssistant()
-      showToast(`已同步 ${result.count} 项日程${result.deliveryError ? '；微信发送受限，请与助手互动后重试' : result.connected ? '' : '；微信尚未扫码连接'}`)
+      showToast(`今日清单已同步，共 ${result.todayCount} 项未完成${result.deliveryError ? '；微信发送受限，请与助手互动后重试' : result.connected ? '' : '；微信尚未扫码连接'}`)
     }catch(error){showToast(error instanceof Error ? error.message : '连接失败，请重试')}
     finally{setBusy(false)}
   }
@@ -27,7 +27,7 @@ export function AssistantSettings() {
     </button>
     <Modal open={open} onClose={()=>setOpen(false)} title="微信日程助手">
       <div className="space-y-4">
-        <p className="text-xs text-gray-600 leading-relaxed">启用后，同步有日期和时间的单次日程。你主动发给微信的记账内容会经腾讯及助手云端处理，云端加密暂存最多7天，手机确认入账后移除。完整账本、账户列表、任务描述及私人笔记不上传；查账仍在 APK 中进行。</p>
+        <p className="text-xs text-gray-600 leading-relaxed">启用后，同步单次日程，并为微信早报同步习惯的重复规则及当天完成状态。早报列出当天未完成的待办、习惯和时间未定事项，不包含逾期事项。你主动发给微信的记账内容会经腾讯及助手云端处理，云端加密暂存最多7天，手机确认入账后移除。完整账本、账户列表、任务描述及私人笔记不上传；查账仍在 APK 中进行。</p>
         <p className="text-xs text-gray-500">例如“微信，午饭支出30元”。漏说账户、金额或收支类型会追问；账户名称须与 APK 一致。语音需要微信提供转写，没有转写时会提示补发文字。打开 APK 后自动接收入账，应用关闭期间先保持待同步；默认归入其他收支，可在记账页修改分类。</p>
         <p className="text-xs text-gray-500">微信消息可能受会话有效期限制；手机后台同步也可能延迟。请在重要日程前检查系统日历。</p>
         <label className="block text-sm">你的助手服务地址<TextInput type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://你的助手.workers.dev" className="mt-1 w-full border rounded-xl p-3" autoCapitalize="none" autoCorrect="off" /></label>
