@@ -18,6 +18,7 @@ test('phone shares only missing agenda fields, skips unchanged uploads and prese
  const {syncAssistantAgenda}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
  const originalFetch=globalThis.fetch;let uploads=0,conflict=false,last;
  globalThis.fetch=async(url,options)=>{
+  if(options.method==='GET'){assert.ok(url.endsWith('/v1/agenda'));return Response.json({version:5})}
   assert.ok(url.endsWith('/v1/agenda'));last=JSON.parse(options.body);uploads++;
   assert.ok(!options.body.includes('PRIVATE'));assert.deepEqual(last.tasks.map(t=>t.id),['dated','habit','weekly']);
   assert.equal(last.tasks.find(t=>t.id==='habit').completed,true);
@@ -31,5 +32,7 @@ test('phone shares only missing agenda fields, skips unchanged uploads and prese
   state.tasks[0].title='changed';conflict=true;const previous=values.get('wb.assistant.agenda.v1');
   await assert.rejects(syncAssistantAgenda(config),/其他设备/);assert.equal(values.get('wb.assistant.agenda.v1'),previous);
   conflict=false;await syncAssistantAgenda(config);assert.equal(last.baseVersion,1);
+  values.set('wb.assistant.agenda.rebase.v1','1');
+  await syncAssistantAgenda(config);assert.equal(last.baseVersion,5);assert.equal(values.get('wb.assistant.agenda.rebase.v1'),'0');
  }finally{globalThis.fetch=originalFetch;delete globalThis.agendaTest}
 });

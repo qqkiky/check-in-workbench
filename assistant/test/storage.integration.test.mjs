@@ -37,6 +37,7 @@ test('real Worker runtime encrypts schedules, isolates roles and rejects stale w
     assert.equal((await (await upload(0)).json()).version,1); // Lost replies retry without duplicate snapshots.
     agendaTask.title='UpdatedHabitTitle';assert.equal((await upload(0)).status,409);
     assert.equal((await (await upload(1)).json()).version,2);
+    assert.equal((await (await mf.dispatchFetch('https://test.workers.dev/v1/agenda',{headers})).json()).version,2);
     // Seed an incoming WeChat bill into encrypted state, then exercise the actual phone API.
     const saved=await db.prepare('SELECT ciphertext FROM assistant_state WHERE id=1').first();
     const key=await crypto.subtle.importKey('raw',Buffer.alloc(32,7),'AES-GCM',false,['encrypt','decrypt']);

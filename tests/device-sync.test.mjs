@@ -27,6 +27,7 @@ test('two devices merge new data, ask on conflicts, reject wrong keys and never 
   const a=new Map([[notes,JSON.stringify([{id:'a',content:'PRIVATE_A'}])]]),b=new Map([[notes,JSON.stringify([{id:'b',content:'B'}])]]);
   fixtures.values=a;await service.saveDataConnection(fixtures.config.url,fixtures.config.token,key);
   await service.commitDataSync(await service.prepareDataSync());
+  assert.equal(a.get('wb.assistant.agenda.rebase.v1'),'1');
   fixtures.values=b;await service.saveDataConnection(fixtures.config.url,fixtures.config.token,key);
   await service.commitDataSync(await service.prepareDataSync());assert.equal(noteList().length,2);
   fixtures.values=a;a.set(notes,JSON.stringify([{id:'a',content:'A2'}]));

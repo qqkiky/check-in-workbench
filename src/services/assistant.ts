@@ -13,6 +13,7 @@ const CONFIG_KEY = 'wb.assistant.connection.v1'
 const META_KEY = 'wb.assistant.versions.v1'
 const BOOKKEEPING_RECEIPTS = 'wb.assistant.bookkeeping.receipts.v1'
 const AGENDA_META = 'wb.assistant.agenda.v1'
+const AGENDA_REBASE = 'wb.assistant.agenda.rebase.v1'
 const NativeAssistant = registerPlugin<{ configure(options: { enabled: boolean }): Promise<void> }>('AssistantBackground')
 export interface AssistantConfig { url: string; token: string; enabled: boolean }
 export interface SharedSchedule {
@@ -94,9 +95,13 @@ export async function syncAssistantAgenda(config:AssistantConfig) {
   if(!state.initialized)throw new Error('本机数据尚未读取完成，请稍后同步')
   const tasks=assistantAgenda(state.tasks,state.records),fingerprint=JSON.stringify(tasks)
   const previous=JSON.parse(appStorage.getItem(AGENDA_META)||'null')
-  if(previous?.fingerprint===fingerprint)return
-  const result=await request(config,'/v1/agenda',{tasks,baseVersion:previous?.version||0})
+  // A completed full-data merge already includes the user's conflict choices.
+  const merged=appStorage.getItem(AGENDA_REBASE)==='1'
+  if(previous?.fingerprint===fingerprint&&!merged)return
+  const baseVersion=merged?(await request(config,'/v1/agenda')).version:previous?.version||0
+  const result=await request(config,'/v1/agenda',{tasks,baseVersion})
   appStorage.setItem(AGENDA_META,JSON.stringify({version:result.version,fingerprint}))
+  appStorage.setItem(AGENDA_REBASE,'0')
   await flushPrivateStorage()
 }
 

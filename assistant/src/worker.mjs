@@ -222,6 +222,9 @@ export default {
         const {state}=await load(env);
         return respond({tasks:state.tasks.map(t=>({...safeTask(t),version:t.version,updatedAt:t.updatedAt})),deliveryError:!!state.deliveryError,connected:!!state.botToken});
       }
+      if(request.method==='GET'&&url.pathname==='/v1/agenda') {
+        const {state}=await load(env);return respond({version:state.agenda?.version||0});
+      }
       if (request.method==='POST') {
         const maxBytes=['/v1/data-sync','/v1/agenda'].includes(url.pathname)?750000:32768;
         if (Number(request.headers.get('Content-Length') || 0)>maxBytes) return respond({error:'too_large'},413);

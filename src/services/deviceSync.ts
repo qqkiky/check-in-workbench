@@ -72,6 +72,7 @@ export async function commitDataSync(plan:SyncPlan,choices:Choices={}){
     updates['wb.settings.v1']=JSON.stringify({...settings,...merged.preferences})
     updates['wb.initialized.v1']='1'
     updates[BASE]=JSON.stringify({binding:plan.binding,snapshot:merged,version:result.version})
+    updates['wb.assistant.agenda.rebase.v1']='1'
     await saveStorageBatch(updates);useStore.getState().reload()
     return result.version
   }finally{committing=false;releaseAssistant()}
