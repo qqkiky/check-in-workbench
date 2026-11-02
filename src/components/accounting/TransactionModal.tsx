@@ -1,3 +1,4 @@
+import { TextInput } from '@/components/common/TextField'
 import { useEffect, useMemo, useState } from 'react'
 import type { Transaction, AcctCategory, Account, TxnType } from '@/types'
 import { Modal } from '@/components/common/Modal'
@@ -237,7 +238,7 @@ export function TransactionModal({
       </div>
 
       {/* 备注 */}
-      <input
+      <TextInput
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="备注（可选）"

@@ -1,3 +1,4 @@
+import { TextInput } from '@/components/common/TextField'
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@/store'
 import { TaskCard } from '@/components/tasks/TaskCard'
@@ -327,7 +328,7 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
         {viewMode === 'quick' && (
           <div className="pt-3">
             <div className="flex items-center gap-2 mb-3">
-              <input
+              <TextInput
                 value={quickText}
                 onChange={(e) => setQuickText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addQuick()}

@@ -1,3 +1,4 @@
+import { TextInput } from '@/components/common/TextField'
 import { useEffect, useMemo, useState } from 'react'
 import type { Account, Transaction, Transfer } from '@/types'
 import { Modal } from '@/components/common/Modal'
@@ -318,7 +319,7 @@ export function TransferModal({
           <div className="grid grid-cols-3 gap-2 mb-4">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-gray-500">手续费</span>
-              <input
+              <TextInput
                 type="number"
                 inputMode="decimal"
                 value={fee}
@@ -348,7 +349,7 @@ export function TransferModal({
           </div>
 
           {/* 备注 */}
-          <input
+          <TextInput
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="备注（可选，如：还信用卡）"

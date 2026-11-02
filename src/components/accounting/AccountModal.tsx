@@ -1,3 +1,4 @@
+import { TextInput } from '@/components/common/TextField'
 import { useEffect, useState } from 'react'
 import type { Account, AccountType } from '@/types'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_EMOJI } from '@/types'
@@ -90,7 +91,7 @@ export function AccountModal({ open, onClose, initial, onSave, onDelete }: Props
       <div className="space-y-4">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">账户名称</span>
-          <input
+          <TextInput
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="如：招商银行"
@@ -120,7 +121,7 @@ export function AccountModal({ open, onClose, initial, onSave, onDelete }: Props
 
         <label className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">初始余额（元）</span>
-          <input
+          <TextInput
             type="number"
             inputMode="decimal"
             value={initialBalance}

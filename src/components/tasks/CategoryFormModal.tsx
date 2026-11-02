@@ -1,3 +1,4 @@
+import { TextInput } from '@/components/common/TextField'
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
@@ -80,7 +81,7 @@ export function CategoryFormModal({ open, categoryId, onClose, onSaved }: Props)
       <div className="space-y-4">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">分类名称</label>
-          <input
+          <TextInput
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}

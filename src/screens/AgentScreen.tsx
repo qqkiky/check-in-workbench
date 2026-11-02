@@ -1,3 +1,4 @@
+import { TextArea, TextInput } from '@/components/common/TextField'
 import { useEffect, useRef, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { showToast } from '@/components/common/Toast'
@@ -35,8 +36,10 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
   useEffect(()=>{
     const cancel=()=>{pointer.current=null;setCancelVoice(false);voice.current?.cancel()}
     const hidden=()=>{if(document.visibilityState!=='visible')cancel()}
-    window.addEventListener('blur',cancel);document.addEventListener('visibilitychange',hidden)
-    return ()=>{window.removeEventListener('blur',cancel);document.removeEventListener('visibilitychange',hidden);voice.current?.cancel()}
+    // Keyboard/permission windows can briefly blur the WebView. Native onPause
+    // and visibilitychange still cancel when the app actually leaves the foreground.
+    document.addEventListener('visibilitychange',hidden)
+    return ()=>{document.removeEventListener('visibilitychange',hidden);voice.current?.cancel()}
   },[])
   async function send(message=input,fromVoice=false) {
     if(!message.trim()||busy)return
@@ -101,17 +104,17 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
       <div className="flex items-end gap-2">
         <button type="button" aria-label={voiceMode?'切换到文字输入':'切换到语音输入'} disabled={busy||voiceActive} onClick={()=>setVoiceMode(!voiceMode)} className="w-11 h-12 shrink-0 rounded-xl bg-gray-100 text-sm text-gray-600 disabled:opacity-40">{voiceMode?'文字':'语音'}</button>
         {voiceMode?<button type="button" disabled={busy||voicePhase==='finishing'} aria-label="按住说话" aria-pressed={voicePhase==='listening'}
-          className={`flex-1 min-w-0 h-12 rounded-xl border text-sm font-medium select-none disabled:opacity-40 ${cancelVoice?'bg-red-500 text-white border-red-500':voiceActive?'bg-primary text-white border-primary':'bg-gray-100 text-gray-700 border-gray-200'}`}
+          className={`flex-1 min-w-0 min-h-16 px-3 py-4 rounded-2xl border text-base font-medium select-none disabled:opacity-40 ${cancelVoice?'bg-red-500 text-white border-red-500':voiceActive?'bg-primary text-white border-primary':'bg-gray-100 text-gray-700 border-gray-200'}`}
           style={{touchAction:'none'}} onContextMenu={e=>e.preventDefault()}
-          onPointerDown={e=>{if(e.button!==0||busy||voiceActive)return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);pointer.current={id:e.pointerId,y:e.clientY,cancel:false};startVoice()}}
-          onPointerMove={e=>{if(pointer.current?.id!==e.pointerId)return;const cancel=e.clientY<pointer.current.y-60;pointer.current.cancel=cancel;setCancelVoice(cancel)}}
+          onPointerDown={e=>{if(!e.isPrimary||e.button!==0||busy||voiceActive)return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);pointer.current={id:e.pointerId,y:e.clientY,cancel:false};startVoice()}}
+          onPointerMove={e=>{if(pointer.current?.id!==e.pointerId)return;const distance=pointer.current.y-e.clientY;const cancel=distance>(pointer.current.cancel?72:112);pointer.current.cancel=cancel;setCancelVoice(cancel)}}
           onPointerUp={e=>{if(pointer.current?.id!==e.pointerId)return;const cancel=pointer.current.cancel;pointer.current=null;setCancelVoice(false);if(cancel)voice.current?.cancel();else voice.current?.release()}}
           onPointerCancel={()=>{pointer.current=null;setCancelVoice(false);voice.current?.cancel()}}
           onLostPointerCapture={()=>{if(pointer.current){pointer.current=null;setCancelVoice(false);voice.current?.cancel()}}}
           onKeyDown={e=>{if(e.key==='Escape'){voice.current?.cancel();return}if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();startVoice()}}}
           onKeyUp={e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();voice.current?.release()}}}
-        >{cancelVoice?'松开取消':voicePhase==='preparing'?'正在准备…':voicePhase==='listening'?'松开发送，上滑取消':voicePhase==='finishing'?'正在识别…':voicePhase==='ready'?'录音已结束，松开发送':'按住说话'}</button>:<>
-          <textarea aria-label="给 AI 助手发消息" value={input} disabled={busy||voiceActive} onChange={e=>setInput(e.target.value)} rows={2} maxLength={4000} placeholder="说说要安排或记录的事情…" className="flex-1 min-w-0 resize-none bg-gray-100 rounded-xl px-3 py-2 text-base outline-none"/>
+        >{cancelVoice?'松开取消':voicePhase==='preparing'?'正在准备，请继续按住…':voicePhase==='listening'?'松开发送，上滑取消':voicePhase==='finishing'?'正在识别…':voicePhase==='ready'?'录音已结束，松开发送':'按住说话'}</button>:<>
+          <TextArea aria-label="给 AI 助手发消息" value={input} disabled={busy||voiceActive} onChange={e=>setInput(e.target.value)} rows={2} maxLength={4000} placeholder="说说要安排或记录的事情…" className="flex-1 min-w-0 resize-none bg-gray-100 rounded-xl px-3 py-2 text-base outline-none"/>
           <button disabled={busy||voiceActive||!input.trim()} type="submit" className="px-4 py-3 bg-primary rounded-xl text-white text-sm disabled:opacity-40">发送</button>
         </>}
       </div>
@@ -130,10 +133,10 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
       }}>
         <p className="text-xs text-gray-500">使用你自己的开发者 API Key，费用或免费额度由服务商决定。密钥仅加密保存在这台手机，不随备份和设备同步导出。</p>
         <div className="flex gap-2 flex-wrap">{PRESETS.map(preset=><button type="button" key={preset.name} disabled={testing} onClick={()=>{setConfig({...config,url:preset.url,model:preset.model,key:''});setSettingsError('')}} className="rounded-full px-3 py-1.5 bg-gray-100 text-xs disabled:opacity-40">{preset.name}</button>)}</div>
-        <label className="block text-sm">服务地址<input name="url" value={config.url} disabled={testing} onChange={e=>setConfig({...config,url:e.target.value})} type="url" autoCapitalize="none" autoCorrect="off" placeholder="https://服务地址/v1" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
-        <label className="block text-sm">API Key<input name="key" value={config.key} disabled={testing} onChange={e=>setConfig({...config,key:e.target.value})} type={showKey?'text':'password'} autoComplete="off" autoCapitalize="none" autoCorrect="off" placeholder="只填在这里，不要发到对话里" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
+        <label className="block text-sm">服务地址<TextInput name="url" value={config.url} disabled={testing} onChange={e=>setConfig({...config,url:e.target.value})} type="url" autoCapitalize="none" autoCorrect="off" placeholder="https://服务地址/v1" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
+        <label className="block text-sm">API Key<TextInput name="key" value={config.key} disabled={testing} onChange={e=>setConfig({...config,key:e.target.value})} type={showKey?'text':'password'} autoComplete="off" autoCapitalize="none" autoCorrect="off" placeholder="只填在这里，不要发到对话里" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
         <button type="button" disabled={testing} onClick={()=>setShowKey(!showKey)} className="text-xs text-primary">{showKey?'隐藏密钥':'显示密钥'}</button>
-        <label className="block text-sm">模型名／接入点 ID<input name="model" value={config.model} disabled={testing} onChange={e=>setConfig({...config,model:e.target.value})} autoCapitalize="none" autoCorrect="off" placeholder="填写服务商控制台提供的模型名" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
+        <label className="block text-sm">模型名／接入点 ID<TextInput name="model" value={config.model} disabled={testing} onChange={e=>setConfig({...config,model:e.target.value})} autoCapitalize="none" autoCorrect="off" placeholder="填写服务商控制台提供的模型名" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
         <p className="text-xs text-gray-400">支持 OpenAI 兼容的 Chat Completions 和工具调用。切换服务地址或模型会清空旧对话，避免把旧对话自动发给另一家服务商。</p>
         {settingsError&&<p role="alert" className="text-sm text-red-600 bg-red-50 p-3 rounded-xl break-words">{settingsError}</p>}
         <button type="submit" disabled={testing} className="w-full rounded-xl bg-primary text-white p-3 disabled:opacity-40">{testing?'连接测试中…':'测试连接并保存'}</button>

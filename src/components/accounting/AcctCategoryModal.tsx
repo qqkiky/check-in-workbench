@@ -1,3 +1,4 @@
+import { TextInput } from '@/components/common/TextField'
 import { useEffect, useState } from 'react'
 import type { AcctCategory, TxnType } from '@/types'
 import { Modal } from '@/components/common/Modal'
@@ -90,7 +91,7 @@ export function AcctCategoryModal({ open, onClose, initial, onSave, onDelete }: 
       <div className="space-y-4">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">分类名称</span>
-          <input
+          <TextInput
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="如：餐饮"

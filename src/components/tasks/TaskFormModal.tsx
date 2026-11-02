@@ -1,3 +1,4 @@
+import { TextInput, TextArea } from '@/components/common/TextField'
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
@@ -164,7 +165,7 @@ export function TaskFormModal({ open, taskId, defaultCategoryId, defaultSchedule
           {/* 标题 */}
           <div>
             <label className="text-xs text-gray-500 mb-1 block">任务标题 *</label>
-            <input
+            <TextInput
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -176,7 +177,7 @@ export function TaskFormModal({ open, taskId, defaultCategoryId, defaultSchedule
           {/* 描述 */}
           <div>
             <label className="text-xs text-gray-500 mb-1 block">备注（可选）</label>
-            <textarea
+            <TextArea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="补充说明"
@@ -320,14 +321,14 @@ export function TaskFormModal({ open, taskId, defaultCategoryId, defaultSchedule
             </label>
             {targetEnabled && (
               <div className="flex gap-2">
-                <input
+                <TextInput
                   type="number"
                   value={target}
                   onChange={(e) => setTarget(e.target.value)}
                   placeholder="目标数值，如 1000"
                   className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-gray-100 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition"
                 />
-                <input
+                <TextInput
                   type="text"
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
@@ -372,7 +373,7 @@ export function TaskFormModal({ open, taskId, defaultCategoryId, defaultSchedule
             {recurrence === 'monthly' && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-xs text-gray-500">每月</span>
-                <input
+                <TextInput
                   type="number"
                   min={1}
                   max={31}

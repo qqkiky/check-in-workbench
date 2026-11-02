@@ -26,7 +26,7 @@ async function load(){
 
 test('local agent validates schedules, preserves identity on edits and syncs occurrence completion',async()=>{
  const {fixture:f,service:a}=await load();
- await assert.rejects(a.executeWorkbench({action:'add_task',title:'报告'}),/补充/);assert.equal(f.state.tasks.length,0);
+ await assert.rejects(a.executeWorkbench({action:'add_task'}),/补充/);assert.equal(f.state.tasks.length,0);
  await a.executeWorkbench({action:'add_task',title:'整理资料',date:'2026-11-02',time:'17:00'});const id=f.state.tasks[0].id;
  await a.executeWorkbench({action:'update_task',query:id,date:'2026-12-01',time:'18:00',title:'整理测试资料'});
  assert.equal(f.state.tasks.length,1);assert.equal(f.state.tasks[0].scheduledDate,'2026-12-01');assert.equal(f.state.tasks[0].id,id);
@@ -39,6 +39,21 @@ test('local agent validates schedules, preserves identity on edits and syncs occ
  await a.executeWorkbench({action:'update_task',query:'旧重复任务',time:'10:00'});assert.equal(f.state.tasks.find(t=>t.id==='legacy').scheduledTime,'10:00');
  f.state.tasks.push({id:'quick',title:'临时小事',recurrence:'none',isQuick:true});await a.executeWorkbench({action:'update_task',query:'临时小事',title:'修改后的小事'});assert.equal(f.state.tasks.find(t=>t.id==='quick').title,'修改后的小事');
  const range=await a.executeWorkbench({action:'list_tasks',startDate:'2026-11-02',endDate:'2026-11-08'});assert.match(range.text,/2026-11-02 10:00 旧重复任务/);assert.ok(!range.text.includes('整理测试资料'));
+});
+
+test('undated and untimed todos save directly, and later scheduling preserves their identity',async()=>{
+ const {fixture:f,service:a}=await load();
+ const result=await a.executeWorkbench({action:'add_task',title:'有空整理书柜'});
+ const quick=f.state.tasks[0];assert.equal(quick.isQuick,true);assert.equal(quick.scheduledTime,undefined);assert.equal(quick.scheduledDate,undefined);assert.equal(quick.reminderEnabled,false);assert.match(result.text,/时间未定/);
+ await a.executeWorkbench({action:'add_task',title:'周一整理资料',date:'2026-11-02'});
+ const dated=f.state.tasks[0];assert.equal(dated.scheduledDate,'2026-11-02');assert.equal(dated.scheduledTime,undefined);assert.equal(dated.isQuick,false);
+ await a.executeWorkbench({action:'update_task',query:quick.id,date:'2026-11-03',time:'15:00'});
+ const planned=f.state.tasks.find(t=>t.id===quick.id);assert.equal(planned.isQuick,false);assert.equal(planned.scheduledTime,'15:00');assert.equal(f.state.tasks.length,2);
+ await a.executeWorkbench({action:'update_task',query:quick.id,time:''});
+ const cleared=f.state.tasks.find(t=>t.id===quick.id);assert.equal(cleared.scheduledTime,undefined);assert.equal(cleared.scheduledDate,'2026-11-03');assert.equal(cleared.reminderEnabled,false);
+ await a.executeWorkbench({action:'add_task',title:'每天伸展，时间待定',recurrence:'daily'});assert.equal(f.state.tasks[0].isQuick,false);assert.equal(f.state.tasks[0].scheduledTime,undefined);
+ await assert.rejects(a.executeWorkbench({action:'add_task',title:'买菜',time:'15:00'}),/日期/);
+ await assert.rejects(a.executeWorkbench({action:'add_task',title:'买菜',time:'三点'}),/几点/);
 });
 
 test('money and accounts are explicit; moving a bill preserves identity and transfers do not inflate expenses',async()=>{

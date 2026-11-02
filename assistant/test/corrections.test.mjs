@@ -74,7 +74,8 @@ test('invalid partial corrections cannot damage a task and successful edits rese
  assert.equal(invalid.tasks[0].time,'15:00');assert.equal(invalid.tasks[0].version,1);
 });
 
-test('a batch of separate WeChat messages corrects the draft then updates one stored task',async()=>{
+test('a batch of separate WeChat messages corrects the draft then updates one stored task',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now});
  const key=await crypto.subtle.importKey('raw',Buffer.alloc(32,7),'AES-GCM',false,['encrypt','decrypt']);
  const initial={tasks:[],seen:[],outbox:[],cursor:'',owner:'owner',botToken:'TEST_ONLY',settings:{morningTime:'08:00',followupMinutes:30,quietStart:'00:00',quietEnd:'23:59'},scheduleDraft:cleanDraft({items:[{title:task.title,date:task.date,period:'下午'}],question:'下午几点？'})};
  const iv=crypto.getRandomValues(new Uint8Array(12));

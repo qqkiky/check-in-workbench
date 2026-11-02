@@ -1,3 +1,4 @@
+import { TextArea, TextInput } from '@/components/common/TextField'
 import { useEffect, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import type { Task, CheckInRecord, Category, AppSettings } from '@/types'
@@ -444,7 +445,7 @@ export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNote
             <span className="flex-1 h-px bg-gray-200" />
           </div>
 
-          <textarea
+          <TextArea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             placeholder="把导出的 JSON 内容粘贴到这里…"
@@ -515,7 +516,7 @@ export function MoreScreen({ onOpenNotes, onOpenList, onNavigate }: { onOpenNote
             <label className="text-xs text-gray-500 mb-1 block">每月预算（元）</label>
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-100 focus-within:ring-2 focus-within:ring-primary/30">
               <span className="text-gray-400 text-base">¥</span>
-              <input
+              <TextInput
                 type="number"
                 min="0"
                 inputMode="decimal"
@@ -760,7 +761,7 @@ function SyncModal({
         {/* URL */}
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Supabase Project URL</label>
-          <input
+          <TextInput
             type="url"
             inputMode="url"
             autoCapitalize="off"
@@ -777,7 +778,7 @@ function SyncModal({
         {/* anon key */}
         <div>
           <label className="text-xs text-gray-500 mb-1 block">anon public key</label>
-          <textarea
+          <TextArea
             value={keyDraft}
             onChange={(e) => setKeyDraft(e.target.value)}
             placeholder="eyJhbGciOi…（只填 anon，不要填 service_role）"

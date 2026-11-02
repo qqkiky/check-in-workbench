@@ -60,7 +60,7 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
   const selectTask=()=>one(args.targetDate?taskList.filter(item=>item.recurrence!=='none'||item.scheduledDate===args.targetDate):taskList,args.query,taskLabel)
   const txnLabel=(item:Transaction)=>`${fmtDate(new Date(item.datetime))} ${item.type==='income'?'收入':'支出'} ${formatMoney(item.amount)} ${accountName(item.accountId)} ${item.note||''}`
   const txns=()=>s.transactions.filter(item=>inRange(fmtDate(new Date(item.datetime)),args)&&(!args.date||fmtDate(new Date(item.datetime))===date(args.date))&&(!args.type||item.type===args.type)&&(!args.account||item.accountId===account(args.account).id))
-  let run:(()=>void)|undefined, label='', guard='', calendar=false
+  let run:(()=>void)|undefined, label='', guard='', calendar=false, untimedTask=false
   if(args.action==='list_tasks') {
     const selected=taskList.filter(item=>!args.query||item.title.includes(args.query)||item.id===args.query)
     const start=args.date||args.startDate,end=args.date||args.endDate
@@ -73,15 +73,19 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
     const current=args.action==='update_task'?selectTask():null
     const recurrence=args.recurrence??current?.recurrence??'none'
     if(!['none','daily','weekly','monthly'].includes(recurrence))throw new Error('重复方式不正确')
-    const patch:Partial<Task>={title:args.title!==undefined?text(args.title,'任务内容'):current?.title,scheduledDate:args.date!==undefined?date(args.date):current?.scheduledDate,scheduledTime:args.time!==undefined?time(args.time):current?.scheduledTime,recurrence:recurrence as Task['recurrence']}
-    if(!patch.title||(!current?.isQuick&&(!patch.scheduledTime||(!patch.scheduledDate&&(!current||recurrence==='none')))))throw new Error('请补充任务内容、日期和具体时间')
+    const patch:Partial<Task>={title:args.title!==undefined?text(args.title,'任务内容'):current?.title,scheduledDate:args.date!==undefined?date(args.date):current?.scheduledDate,scheduledTime:args.time!==undefined?(args.time===''?undefined:time(args.time)):current?.scheduledTime,recurrence:recurrence as Task['recurrence']}
+    if(!patch.title)throw new Error('请补充任务内容')
+    if(patch.scheduledTime&&!patch.scheduledDate&&recurrence==='none')throw new Error('请补充任务日期')
+    patch.isQuick=recurrence==='none'&&!patch.scheduledDate&&!patch.scheduledTime
+    patch.reminderEnabled=!!patch.scheduledTime&&(current?.reminderEnabled??true)
+    untimedTask=!patch.scheduledTime
     if(args.duration!==undefined&&(!Number.isInteger(args.duration)||args.duration<1||args.duration>1440))throw new Error('请明确有效时长')
     patch.duration=args.duration??current?.duration??30
     patch.weekdays=args.weekdays??current?.weekdays;patch.monthDay=args.monthDay??current?.monthDay
     if(recurrence==='weekly'&&(!patch.weekdays?.length||patch.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
     if(recurrence==='monthly'&&(!Number.isInteger(patch.monthDay)||patch.monthDay!<1||patch.monthDay!>31))throw new Error('请明确每月几号')
-    label=`${patch.scheduledDate||'未指定单次日期'} ${patch.scheduledTime||''} ${patch.title}`;calendar=true
-    run=current?()=>s.updateTask(current.id,patch):()=>s.addTask({...patch,categoryId:'work',reminderEnabled:true,reminderLead:0} as Omit<Task,'id'|'createdAt'|'updatedAt'>)
+    label=`${patch.scheduledDate||'日期未定'} ${patch.scheduledTime||'时间未定'} ${patch.title}`;calendar=true
+    run=current?()=>s.updateTask(current.id,patch):()=>s.addTask({...patch,categoryId:'work',reminderLead:0} as Omit<Task,'id'|'createdAt'|'updatedAt'>)
   } else if(args.action==='complete_task'||args.action==='update_completion_time'||args.action==='reopen_task') {
     if(args.action==='reopen_task'&&(args.time||args.completedTime||args.completedDate))throw new Error('修改完成时间请使用 update_completion_time；本次保留已完成状态')
     const task=selectTask(), taskRecords=s.records.filter(item=>item.taskId===task.id)
@@ -173,7 +177,7 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
   let calendarText=''
   if(calendar) {
     if(!isCalendarSyncEnabled())calendarText='；尚未开启系统日历同步'
-    else try{const latest=useStore.getState();await syncTasksToCalendar(latest.tasks,latest.records);calendarText='；已同步系统日历'}catch{calendarText='；日历同步暂未成功，请检查日历权限'}
+    else try{const latest=useStore.getState();await syncTasksToCalendar(latest.tasks,latest.records);calendarText=untimedTask?'；补充具体时间后写入系统日历':'；已同步系统日历'}catch{calendarText='；日历同步暂未成功，请检查日历权限'}
   }
   return {text:`${args.action.startsWith('delete_')?'已删除':args.action==='complete_task'?'已完成':args.action==='reopen_task'?'已恢复待办':'已保存'}：${label}${calendarText}`,modelStatus:'操作已在本机保存'+(calendarText?'，日历状态已向用户显示':'')}
 }

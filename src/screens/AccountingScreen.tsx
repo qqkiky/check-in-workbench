@@ -1,3 +1,4 @@
+import { TextInput } from '@/components/common/TextField'
 import { useMemo, useState } from 'react'
 import {
   PieChart,
@@ -443,7 +444,7 @@ export function AccountingScreen() {
               </select>
               <div className="flex items-center gap-1 bg-white rounded-xl px-3 py-1.5 border border-gray-100 flex-1 min-w-[120px]">
                 <Icons.Search size={14} className="text-gray-400" />
-                <input
+                <TextInput
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="搜索备注"

@@ -1,3 +1,4 @@
+import { TextArea } from '@/components/common/TextField'
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
@@ -134,7 +135,7 @@ export function TimelineNoteModal({
 
         <div>
           <label className="text-xs text-gray-500 mb-1 block">内容</label>
-          <textarea
+          <TextArea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="写点什么，比如：和老友通了电话、看了场电影…"

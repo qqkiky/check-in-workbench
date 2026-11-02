@@ -1,3 +1,4 @@
+import { TextArea } from '@/components/common/TextField'
 import { useState } from 'react'
 import { useStore } from '@/store'
 import { Icons } from '@/components/common/Icons'
@@ -59,7 +60,7 @@ export function NotesScreen({ onBack }: { onBack: () => void }) {
       <div className="flex-1 overflow-y-auto pb-24 px-3 space-y-3">
         {/* 新增 */}
         <div className="bg-white rounded-2xl p-3 shadow-card">
-          <textarea
+          <TextArea
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="随手记点什么，临时但想留住的内容…"
@@ -91,7 +92,7 @@ export function NotesScreen({ onBack }: { onBack: () => void }) {
               <div key={n.id} className="bg-white rounded-2xl px-4 py-3 shadow-card">
                 {editing ? (
                   <>
-                    <textarea
+                    <TextArea
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
                       rows={3}
