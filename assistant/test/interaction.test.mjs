@@ -76,3 +76,10 @@ test('repayment is a pending book transfer; missing amount is asked, not inferre
   for(const change of [{amountCents:0},{amountCents:10.5},{feeCents:-1}])assert.throws(()=>cleanInterpretation({actions:[{type:'transfer',...change}]}));
   assert.throws(()=>cleanInterpretation({actions:[{type:'transfer',amountCents:100},{type:'complete',query:'report'}]}));
 });
+
+test('a transfer never creates an empty schedule draft, even if the model returns one',()=>{
+ const parsed=cleanInterpretation({actions:[{type:'transfer',fromAccount:'工资卡',toAccount:'招行信用卡'}],draft:{items:[{}],question:'多少钱？'}});
+ assert.equal(parsed.draft,undefined);assert.equal(parsed.actions[0].type,'transfer');
+ const state={};applyBookkeeping(state,parsed.actions[0],'missing',at);
+ assert.equal(state.bookkeepingDraft.fromAccount,'工资卡');assert.equal(state.bookkeepingDraft.toAccount,'招行信用卡');assert.equal(state.scheduleDraft,undefined);
+});

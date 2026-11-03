@@ -54,7 +54,7 @@ function correctedTitle(previous,title,text) {
 }
 export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[], text='') {
   if (!Array.isArray(value?.actions) || value.actions.length>10)throw new Error('invalid_actions');
-  let nextDraft=value.draft!==undefined?cleanDraft(value.draft,now):undefined;
+  let nextDraft=value.actions.some(action=>action.type==='transfer')?undefined:value.draft!==undefined?cleanDraft(value.draft,now):undefined;
   if(draft?.items.length===1 && nextDraft?.items.length===1 && nextDraft.items[0].title)nextDraft.items[0].title=correctedTitle(draft.items[0].title,nextDraft.items[0].title,text);
   const ready=(nextDraft?.items || []).filter(item=>item.title && item.date && item.time);
   let actions=value.actions.map(action=>{
@@ -100,6 +100,10 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
     }
     throw new Error('invalid_action');
   });
+  if(actions.some(action=>action.type==='transfer')) {
+    if(actions.length!==1)throw new Error('mixed_transfer');
+    return {actions};
+  }
   for(const item of ready) {
     if(!actions.some(action=>action.type==='create' && action.title===item.title && action.date===item.date && action.time===item.time))actions.push({type:'create',title:item.title,date:item.date,time:item.time,duration:30});
   }
@@ -108,7 +112,6 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
     if(!nextDraft.items.length){nextDraft=null;actions=actions.filter(action=>action.type!=='clarify');}
   }
   if(actions.length>10)throw new Error('too_many_actions');
-  if(actions.some(action=>action.type==='transfer')&&actions.length!==1)throw new Error('mixed_transfer');
   if(draft?.items.length===1 && nextDraft?.items.length===1 && draft.items[0].title!==nextDraft.items[0].title) {
     for(const action of actions)if(action.type==='clarify' && !action.question.includes(nextDraft.items[0].title))action.question=`已更正为“${nextDraft.items[0].title}”。${action.question}`;
   }
