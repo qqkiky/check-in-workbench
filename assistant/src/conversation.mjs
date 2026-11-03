@@ -58,6 +58,11 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
   if(draft?.items.length===1 && nextDraft?.items.length===1 && nextDraft.items[0].title)nextDraft.items[0].title=correctedTitle(draft.items[0].title,nextDraft.items[0].title,text);
   const ready=(nextDraft?.items || []).filter(item=>item.title && item.date && item.time);
   let actions=value.actions.map(action=>{
+    if(['complete','cancel','update','reschedule'].includes(action.type)&&!(typeof action.query==='string'&&action.query.trim())) {
+      const id=action.id||action.taskId
+      if(typeof id==='string'&&tasks.some(task=>task.id===id))action={...action,query:id}
+    }
+    if(action.type==='reschedule'&&(!action.date||!action.time))action={...action,type:'update'};
     if(action.type==='transfer') {
       const clean={type:'transfer'};
       for(const key of ['fromAccount','toAccount','note'])if(action[key]!==undefined) {

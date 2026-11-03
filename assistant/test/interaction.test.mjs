@@ -83,3 +83,17 @@ test('a transfer never creates an empty schedule draft, even if the model return
  const state={};applyBookkeeping(state,parsed.actions[0],'missing',at);
  assert.equal(state.bookkeepingDraft.fromAccount,'工资卡');assert.equal(state.bookkeepingDraft.toAccount,'招行信用卡');assert.equal(state.scheduleDraft,undefined);
 });
+
+test('model date-only reschedule is accepted as a partial update and never asks for the known time',()=>{
+ const parsed=cleanInterpretation({actions:[{type:'reschedule',query:'report',date:'2026-11-04'}]},at,null,[task]);
+ assert.deepEqual(parsed.actions,[{type:'update',query:'report',date:'2026-11-04'}]);
+ const state=initial();applyConversationActions(state,parsed.actions,at,'date-only');
+ assert.equal(state.tasks[0].time,'15:00');assert.equal(state.tasks[0].date,'2026-11-04');
+});
+
+test('an existing candidate ID from the real model is normalized, while an unknown ID is rejected',()=>{
+ const parsed=cleanInterpretation({actions:[{type:'update',id:'report',date:'2026-11-04'}]},at,null,[task]);
+ assert.deepEqual(parsed.actions,[{type:'update',query:'report',date:'2026-11-04'}]);
+ assert.deepEqual(cleanInterpretation({actions:[{type:'complete',taskId:'report'}]},at,null,[task]).actions,[{type:'complete',query:'report'}]);
+ assert.throws(()=>cleanInterpretation({actions:[{type:'update',id:'unknown',date:'2026-11-04'}]},at,null,[task]));
+});
