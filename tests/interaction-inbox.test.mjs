@@ -27,3 +27,11 @@ test('credit repayment uses named accounts, exact cents and a stable transfer ID
   assert.equal(inboxTransfer(item,[...accounts,{id:'duplicate',name:'工资卡'}]),null);
   for(const patch of [{amountCents:0},{amountCents:1.1},{feeCents:-1},{date:'2026-02-30'}])assert.throws(()=>inboxTransfer({...item,...patch},accounts));
 });
+
+test('phone reopening removes only the chosen habit record and preserves other days, tasks and the plan',()=>{
+ const tasks=[structuredClone(habit)],records=[{id:'today',taskId:'h',date:'2026-11-03',completedAt:now},{id:'past',taskId:'h',date:'2026-11-02',completedAt:now-86400000},{id:'other',taskId:'other',date:'2026-11-03',completedAt:now}];
+ const command={id:'undo-0',taskId:'h',targetDate:'2026-11-03',base:assistantAgendaItem(tasks[0],records,new Date(now)),action:{type:'reopen'},createdAt:now};
+ assert.equal(applyTaskCommand(tasks,records,command,now),true);
+ assert.deepEqual(records.map(record=>record.id),['past','other']);assert.equal(tasks[0].scheduledTime,'20:00');assert.equal(tasks[0].recurrence,'daily');assert.equal(tasks[0].description,'PRIVATE_NOTE');
+ assert.equal(applyTaskCommand(tasks,records,command,now),false);assert.deepEqual(records.map(record=>record.id),['past','other']);
+});

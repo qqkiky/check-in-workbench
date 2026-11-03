@@ -20,14 +20,22 @@ export function safeTask(input) {
     reminderEnabled: input.reminderEnabled !== false,
     reminderLead: Math.max(0,Math.min(1440,Number(input.reminderLead)||0)) };
 }
-export function resolveTask(tasks, query) {
+export function reopenRequested(text) {
+  const plain=String(text).replace(/[\s，,。！!？?]/g,'');
+  return !/(不是|并非|没说|没有说|是不是)(没(?:有)?(?:做完|完成)|未完成)/.test(plain)
+    && !/(不要|别|不必|不用|不能)(?:再)?(?:取消|撤销|恢复|改回)/.test(plain)
+    && !/(查询|查看|列出|显示|统计).*(未完成|没做完)/.test(plain)
+    && !/没(?:有)?完成时间/.test(plain)
+    && /(?:没(?:有)?(?:做完|完成|弄完|搞定)|未完成|(?:取消|撤销).{0,8}(?:完成|打卡)|(?:恢复|改回).{0,6}待办)/.test(plain);
+}
+export function resolveTask(tasks, query, status='pending') {
   if (!query) return { error: '请说出任务名称，例如“写报告完成了”。' };
-  const candidates = tasks.filter(task => task.status === 'pending');
+  const candidates = tasks.filter(task => task.status === status);
   const exact = candidates.filter(task => task.id === query || task.title === query);
   const matches = exact.length ? exact : candidates.filter(task => task.title.includes(query));
   if (matches.length === 1) return { task: matches[0] };
   return { error: matches.length ? `找到多项任务，请补充完整名称：\n${matches.map(t => `${t.date} ${t.time} ${t.title}`).join('\n')}`
-    : '没有找到对应的未完成任务，请补充任务名称。' };
+    : `没有找到对应的${status==='completed'?'已完成':'未完成'}任务，请补充任务名称。` };
 }
 export function applyActions(tasks, actions, now = Date.now(), sourceId = 'manual') {
   const next = tasks.map(task => ({ ...task }));
@@ -46,8 +54,8 @@ export function applyActions(tasks, actions, now = Date.now(), sourceId = 'manua
         next.push({ ...task, version: 1, updatedAt: now });
         replies.push(`已记录：${task.date} ${task.time} ${task.title}`);
       } catch { replies.push('日期或时间不明确，请补充，例如“明天下午3点写报告”。'); }
-    } else if (['complete', 'cancel', 'reschedule', 'update'].includes(action.type)) {
-      const result = resolveTask(next, action.taskId || action.query);
+    } else if (['complete', 'reopen', 'cancel', 'reschedule', 'update'].includes(action.type)) {
+      const result = resolveTask(next, action.taskId || action.query,action.type==='reopen'?'completed':'pending');
       if (result.error) { replies.push(result.error); continue; }
       const task = result.task;
       if (action.type === 'reschedule' || action.type === 'update') {
@@ -56,11 +64,12 @@ export function applyActions(tasks, actions, now = Date.now(), sourceId = 'manua
         catch { replies.push('改期时间不明确，请补充日期和具体时间。'); continue; }
         delete task.lastReminderAt;delete task.reminderCount;
       } else {
-        task.status = action.type === 'complete' ? 'completed' : 'cancelled';
+        task.status = action.type === 'complete' ? 'completed' : action.type==='reopen'?'pending':'cancelled';
+        if(action.type==='reopen'){delete task.lastReminderAt;delete task.reminderCount;}
         task.completedAt = action.type === 'complete' ? now : null;
       }
       task.version++; task.updatedAt = now;
-      replies.push(`${action.type === 'complete' ? '✅ 已完成' : action.type === 'cancel' ? '已取消' : '已更新'}：${['update','reschedule'].includes(action.type)?`${task.date} ${task.time} `:''}${task.title}`);
+      replies.push(`${action.type === 'complete' ? '✅ 已完成' : action.type === 'reopen' ? '已恢复未完成' : action.type === 'cancel' ? '已取消' : '已更新'}：${['update','reschedule'].includes(action.type)?`${task.date} ${task.time} `:''}${task.title}`);
     } else if (action.type === 'clarify' && typeof action.question === 'string') {
       replies.push(action.question.slice(0,300));
     }
@@ -70,6 +79,8 @@ export function applyActions(tasks, actions, now = Date.now(), sourceId = 'manua
 
 export function ruleActions(text, now = Date.now()) {
   if (/^(今天|今日)(的)?(任务|安排|日程)[？?]?$/.test(text)) return [{ type: 'list' }];
+  const reopened=text.match(/^(.+?)(?:其实)?(?:还)?(?:没(?:有)?(?:做完|完成|弄完)|未完成)[呢啊呀！!。]?$/);
+  if(reopened&&reopenRequested(text))return [{type:'reopen',query:reopened[1].trim()}];
   const completed = text.match(/^(.+?)(?:已经|已)?(?:完成了|做完了|搞定了|完成|做完)[！!。]?$/);
   if (completed) return [{ type: 'complete', query: completed[1].trim() }];
   // Strict free fallback: require an explicit day, hour and a nonempty title.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import worker from '../src/worker.mjs';
 import {disconnectWeixin,connectionStatus,freshOutbound} from '../src/weixinSession.mjs';
 import {applyConversationActions,effectiveAgenda} from '../src/taskCommands.mjs';
-import {activeFocus,cleanInterpretation} from '../src/conversation.mjs';
+import {activeFocus,cleanInterpretation,followupActions,rememberFocus} from '../src/conversation.mjs';
 import {applyBookkeeping,bookkeepingInput,receiveBookkeeping} from '../src/bookkeeping.mjs';
 
 const at=Date.parse('2026-11-03T13:00:00+08:00');
@@ -96,4 +96,64 @@ test('an existing candidate ID from the real model is normalized, while an unkno
  assert.deepEqual(parsed.actions,[{type:'update',query:'report',date:'2026-11-04'}]);
  assert.deepEqual(cleanInterpretation({actions:[{type:'complete',taskId:'report'}]},at,null,[task]).actions,[{type:'complete',query:'report'}]);
  assert.throws(()=>cleanInterpretation({actions:[{type:'update',id:'unknown',date:'2026-11-04'}]},at,null,[task]));
+});
+
+test('move, complete and explicit pronoun correction restore just the same task and preserve its moved plan',async(t)=>{
+  t.mock.timers.enable({apis:['Date'],now:at});
+  const seed=initial();seed.tasks.push({...task,id:'other',title:'其他事项',status:'completed',completedAt:at-1000});
+  const f=await fixture(seed),original=globalThis.fetch;let step=0,aiCalls=0;
+  const messages=['把实验小结挪到明天','这件事做完了','我搞错了其实这件事没做完'];
+  f.env.AI={async run(){aiCalls++;if(step===1)return {response:JSON.stringify({actions:[{type:'update',query:'report',date:'2026-11-04'}]})};if(step===2)return {response:JSON.stringify({actions:[{type:'complete',query:'report'}]})};throw Error('the explicit correction must work without another model call');}};
+  globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'undo-'+(++step),context_token:'CTX',item_list:[{text_item:{text:messages[step-1]}}]}]}):Response.json({ret:0});
+  try {
+    await poll(f.env);await poll(f.env);let state=await f.read();assert.equal(state.tasks[0].status,'completed');
+    await poll(f.env);state=await f.read();assert.equal(state.tasks[0].status,'pending');assert.equal(state.tasks[0].completedAt,null);
+    assert.equal(state.tasks[0].date,'2026-11-04');assert.equal(state.tasks[0].time,'15:00');assert.equal(state.tasks[1].status,'completed');assert.equal(state.tasks.length,2);assert.equal(aiCalls,2);
+  }finally{globalThis.fetch=original}
+});
+
+test('a completed focus stays available, while bare clocks, unrelated names, negated undo and expired focus never reopen it',()=>{
+ const done={...task,status:'completed',completedAt:at},state={tasks:[done]};
+ rememberFocus(state,[task],[done],at); // The version must change for a new operation.
+ state.scheduleFocus={id:done.id,date:done.date,updatedAt:at};
+ assert.equal(activeFocus(state,at+100).status,'completed');
+ for(const text of ['我搞错了，其实这件事没做完','这件事其实没完成','撤销刚才的完成'])assert.equal(followupActions(state,text,at+100).actions[0].type,'reopen');
+ for(const text of ['下午三点','完成时间改成下午三点','不是没完成，是完成时间说错了','另一项事项没做完','不要撤销完成，只改完成时间','列出未完成事项'])assert.equal(followupActions(state,text,at+100),null);
+ assert.equal(followupActions(state,'这件事没做完',at+15*60000),null);
+ assert.throws(()=>cleanInterpretation({actions:[{type:'reopen',id:'unknown'}]},at,null,[done]));
+ assert.deepEqual(cleanInterpretation({actions:[{type:'reopen',id:done.id,date:done.date}]},at,null,[done]).actions,[{type:'reopen',query:done.id,date:done.date}]);
+});
+test('duplicate completed names need clarification, and an exact ID restores only its matching completion',()=>{
+ const state=initial();state.tasks=[{...task,status:'completed',completedAt:at},{...task,id:'duplicate',status:'completed',completedAt:at},{...task,id:'pending-copy'}];
+ const result=applyConversationActions(state,[{type:'reopen',query:task.title}],at,'ambiguous');
+ assert.match(result.reply,/多项/);assert.equal(state.tasks.filter(task=>task.status==='completed').length,2);
+ applyConversationActions(state,[{type:'reopen',query:task.id}],at,'exact');
+ assert.equal(state.tasks[0].status,'pending');assert.equal(state.tasks[0].date,task.date);assert.equal(state.tasks[0].time,task.time);assert.equal(state.tasks[1].status,'completed');assert.equal(state.tasks[2].status,'pending');
+});
+test('a model cannot undo completion when the user only corrects the completion time',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});const seed=initial();seed.tasks[0]={...task,status:'completed',completedAt:at};seed.scheduleFocus={id:task.id,updatedAt:at};
+ const f=await fixture(seed),original=globalThis.fetch;f.env.AI={async run(){return {response:JSON.stringify({actions:[{type:'reopen',query:task.id}]})};}};
+ globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'time-only',context_token:'CTX',item_list:[{text_item:{text:'完成时间不是三点，是四点'}}]}]}):Response.json({ret:0});
+ try{await poll(f.env);const state=await f.read();assert.equal(state.tasks[0].status,'completed');assert.equal(state.tasks[0].completedAt,at);assert.equal(state.tasks[0].version,task.version);}
+ finally{globalThis.fetch=original}
+});
+test('habit completion and reopening before phone reception project only the chosen occurrence',()=>{
+ const state=initial();
+ const done=applyConversationActions(state,[{type:'complete',query:habit.id,date:'2026-11-04'}],at,'habit-done');
+ state.scheduleFocus={id:done.focusId,date:done.focusDate,updatedAt:at};
+ assert.equal(activeFocus(state,at+100).status,'completed');assert.equal(activeFocus(state,at+100).date,'2026-11-04');
+ const correction=followupActions(state,'我搞错了其实这件事没做完',at+100);
+ applyConversationActions(state,correction.actions,at+100,'habit-undone');
+ assert.deepEqual(effectiveAgenda(state).find(task=>task.id===habit.id).completedDates,[]);assert.equal(state.taskCommands.length,2);
+ assert.equal(state.agenda.tasks[0].recurrence,'daily');assert.equal(state.agenda.tasks[0].time,'20:00');
+});
+
+test('querying unfinished items or explicitly forbidding undo cannot authorize a model reopen',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});
+ for(const text of ['列出未完成事项','不要撤销完成，只改完成时间']) {
+  const seed=initial();seed.tasks[0]={...task,status:'completed',completedAt:at};const f=await fixture(seed),original=globalThis.fetch;
+  f.env.AI={async run(){return {response:JSON.stringify({actions:[{type:'reopen',query:task.id}]})};}};
+  globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'guard',context_token:'CTX',item_list:[{text_item:{text}}]}]}):Response.json({ret:0});
+  try{await poll(f.env);assert.equal((await f.read()).tasks[0].status,'completed');}finally{globalThis.fetch=original}
+ }
 });

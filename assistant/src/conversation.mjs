@@ -1,4 +1,4 @@
-import { validDate, safeTask } from './domain.mjs';
+import { validDate, safeTask, reopenRequested } from './domain.mjs';
 import { conversationTasks } from './taskCommands.mjs';
 
 export function activeDraft(state, now=Date.now()) {
@@ -6,15 +6,21 @@ export function activeDraft(state, now=Date.now()) {
 }
 export function activeFocus(state, now=Date.now()) {
   const focus=state.scheduleFocus;
-  return focus && now-focus.updatedAt<15*60000 ? conversationTasks(state,now).find(task=>task.id===focus.id && task.status==='pending') || null : null;
+  return focus && now-focus.updatedAt<15*60000 ? conversationTasks(state,now,validDate(focus.date)?focus.date:undefined).find(task=>task.id===focus.id && ['pending','completed'].includes(task.status)) || null : null;
 }
 export function rememberFocus(state, before, after, now=Date.now()) {
-  const changed=after.filter(task=>task.status==='pending' && !before.some(previous=>previous.id===task.id && previous.version===task.version));
-  if(changed.length===1)state.scheduleFocus={id:changed[0].id,updatedAt:now};
+  const changed=after.filter(task=>['pending','completed'].includes(task.status) && !before.some(previous=>previous.id===task.id && previous.version===task.version));
+  if(changed.length===1)state.scheduleFocus={id:changed[0].id,date:changed[0].date,updatedAt:now};
   else if(changed.length>1 || !activeFocus({...state,tasks:after},now))delete state.scheduleFocus;
 }
 export function followupActions(state,text,now=Date.now()) {
   const draft=activeDraft(state,now),focus=draft?null:activeFocus(state,now);
+  const plain=text.replace(/[\s，,。！!？?]/g,'');
+  const correction=/^(?:(?:我搞错了|我说错了|刚才说错了|其实|不对|等等|等一下|不好意思|啊|哦|嗯))*(?:这件事|这项任务|这个任务|刚才那件事|刚才那项|它|这个)?(?:其实|还|确实)?(?:没(?:有)?(?:做完|完成|弄完|搞定)|未完成)(?:呢|啊|呀|的)?$/.test(plain)
+    || /^(?:撤销|取消)(?:刚才的)?(?:完成|打卡)(?:状态)?$/.test(plain)
+    || /^(?:把)?(?:这件事|这项任务|它|这个)(?:恢复|改回|标为)(?:成|为)?(?:未完成|待办)$/.test(plain);
+  if(focus&&correction&&reopenRequested(text))return focus.status==='completed'?{actions:[{type:'reopen',query:focus.id,date:focus.date}]}:{actions:[{type:'clarify',question:`「${focus.title}」目前就是未完成，原计划未变。`}]};
+  if(focus?.status==='completed')return null;
   const item=draft?.items.length===1?draft.items[0]:focus;
   if(!item?.title || !item.date)return null;
   const clock=/(上午|下午|晚上|中午|早上)?\s*([0-9零〇一二两三四五六七八九十]{1,3})(?:[:：]([0-9]{2})|点(半|[0-9零〇一二两三四五六七八九十]{1,3}分?)?)/g;
@@ -58,7 +64,7 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
   if(draft?.items.length===1 && nextDraft?.items.length===1 && nextDraft.items[0].title)nextDraft.items[0].title=correctedTitle(draft.items[0].title,nextDraft.items[0].title,text);
   const ready=(nextDraft?.items || []).filter(item=>item.title && item.date && item.time);
   let actions=value.actions.map(action=>{
-    if(['complete','cancel','update','reschedule'].includes(action.type)&&!(typeof action.query==='string'&&action.query.trim())) {
+    if(['complete','reopen','cancel','update','reschedule'].includes(action.type)&&!(typeof action.query==='string'&&action.query.trim())) {
       const id=action.id||action.taskId
       if(typeof id==='string'&&tasks.some(task=>task.id===id))action={...action,query:id}
     }
@@ -91,11 +97,11 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
       const task=safeTask({id:'validation',title:'修改',date:'2000-01-01',time:'00:00',status:'pending',...changes});
       return {type:'update',query:matches.length===1?matches[0].id:action.query.slice(0,200),...(action.targetDate&&validDate(action.targetDate)?{targetDate:action.targetDate}:{}),...Object.fromEntries(Object.keys(changes).map(key=>[key,task[key]]))};
     }
-    if (['complete','cancel','reschedule'].includes(action.type) && typeof action.query==='string') {
+    if (['complete','reopen','cancel','reschedule'].includes(action.type) && typeof action.query==='string') {
       if(action.type==='reschedule')safeTask({...action,id:'validation',title:'改期',status:'pending'});
       const unfinished=draft?.items.filter(item=>item.title===action.query) || [];
       const completedSlots=ready.find(item=>item.title===action.query);
-      if(action.type!=='cancel' && unfinished.length===1 && completedSlots && !tasks.some(task=>task.status==='pending' && task.title.includes(action.query))) {
+      if(['complete','reschedule'].includes(action.type) && unfinished.length===1 && completedSlots && !tasks.some(task=>task.status==='pending' && task.title.includes(action.query))) {
         return {type:'create',title:completedSlots.title,date:completedSlots.date,time:completedSlots.time,duration:30};
       }
       if(action.type==='reschedule' && unfinished.length===1 && !tasks.some(task=>task.status==='pending' && task.title.includes(action.query))) {
