@@ -82,7 +82,7 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
       {!history.entries.length&&<div className="bg-white rounded-2xl p-4 text-sm text-gray-600 space-y-3">
         <p>直接说你想做什么，日程、记账、账户和笔记都可以在这里处理。</p>
         <p>例如：“明天下午五点整理测试资料”“微信支出午饭30元”“查询本月支出”“记一条笔记”。</p>
-        <p className="text-xs text-gray-400">你发送的对话交给所选 API 服务处理。查账、余额和笔记检索结果只在本机显示，不发给模型。删除需要点击确认。点击输入区的“语音”可按住说话、松开发送。</p>
+        <p className="text-xs text-gray-400">你发送的对话及匹配所需的待办标题、日期和状态交给所选 API 服务处理，不包含任务备注。查账、余额和笔记检索结果只在本机显示，不发给模型。删除需要点击确认。点击输入区的“语音”可按住说话、松开发送。</p>
       </div>}
       {history.entries.map(entry=><div key={entry.id} className={`flex ${entry.role==='user'?'justify-end':'justify-start'}`}>
         <div className={`max-w-full min-w-0 rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap break-words ${entry.role==='user'?'bg-primary text-white ml-8':'bg-white text-gray-800 mr-2'}`}>

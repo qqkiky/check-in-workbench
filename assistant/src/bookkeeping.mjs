@@ -7,6 +7,9 @@ export function expireBookkeeping(state, now = Date.now()) {
   if (state.bookkeepingDraft && now - state.bookkeepingDraft.createdAt >= RETENTION_MS) delete state.bookkeepingDraft;
 }
 export function bookkeepingInput(text, draft) {
+  if(/提醒我|待办|日程|安排/.test(text)&&!/已经|已还|还了|付了|支付了/.test(text))return null;
+  if(/转账|还款|还.{0,20}(信用卡|欠款)|信用卡.{0,12}欠款/.test(text)
+    ||draft?.type==='transfer'&&(/^(?:转出账户|转入账户|从账户|到账户|金额|手续费|账户)[:：是为]|^\s*[0-9零〇一二两三四五六七八九十百千万]+(?:[.点][0-9零一二三四五六七八九]+)?\s*(?:元|块钱|块)?[。！!]*$/.test(text)))return {transfer:true};
   if (!draft && !/记账|记一笔|收入|支出|花了|付了|支付|元|块钱/.test(text)
     && (/提醒我|记得|待办|日程|安排/.test(text) || /(今天|明天|后天|下周|周[一二三四五六日天])/.test(text) && /点|[:：]\d{2}|上午|下午|晚上|中午/.test(text))) return null;
   text = text.replace(/(?<![\d.])[零〇一二两三四五六七八九十百千万]+(?:点[零〇一二两三四五六七八九]+)?(?=元|块)/g, value => {
@@ -56,11 +59,15 @@ export function applyBookkeeping(state, input, sourceId, now = Date.now()) {
   }
   if (state.bookkeepingDraft?.note && input.note && input.note !== state.bookkeepingDraft.note) return '还有一笔账未补齐，请先补充上一笔信息；若不再记录上一笔，请回复“取消记账”后重发。';
   const draft = { ...(state.bookkeepingDraft || { id: `wxbook-${sourceId.replace(/[^\w-]/g, '').slice(0,60)}`, createdAt: now, date: cstDay(now) }) };
-  for (const key of ['amountCents','accountName','type','note','date']) if (input[key] !== undefined) draft[key] = input[key];
+  for (const key of ['amountCents','accountName','type','note','date','fromAccount','toAccount','feeCents']) if (input[key] !== undefined) draft[key] = input[key];
   state.bookkeepingDraft = draft;
-  if (!draft.amountCents) return '这笔账是多少元？请回复“支出30元”或“收入100元”。';
+  if (!draft.amountCents) return draft.type==='transfer'?'这次还款或转账记录是多少元？我不会根据欠款猜金额。':'这笔账是多少元？请回复“支出30元”或“收入100元”。';
   if (!draft.type) return '这笔是收入还是支出？请回复“收入”或“支出”。';
-  if (!draft.accountName) return '这笔账用哪个账户？请回复“账户：APK 中的完整账户名”。';
+  if(draft.type==='transfer') {
+    if(!draft.fromAccount)return '从哪个账户扣款？请告诉我期待中的完整账户名。';
+    if(!draft.toAccount)return '转入哪张信用卡或账户？请告诉我期待中的完整账户名。';
+    if(draft.fromAccount===draft.toAccount)return '转出和转入是同一个账户，请核对还款方向。';
+  } else if (!draft.accountName) return '这笔账用哪个账户？请回复“账户：APK 中的完整账户名”。';
   if (!validDate(draft.date)) return '日期不明确，请重新发送这笔账。';
   const previous = state.bookkeeping.find(item => item.id === draft.id);
   if (previous) Object.assign(previous, draft, { version: previous.version + 1 });
@@ -69,6 +76,7 @@ export function applyBookkeeping(state, input, sourceId, now = Date.now()) {
     state.bookkeeping.push({ ...draft, note: (draft.note || '微信记账').slice(0,200), version: 1 });
   }
   delete state.bookkeepingDraft;
+  if(draft.type==='transfer')return `好，记为账户转账：${draft.fromAccount} → ${draft.toAccount}，${(draft.amountCents/100).toFixed(2)}元${draft.feeCents?`，手续费${(draft.feeCents/100).toFixed(2)}元`:''}。等待手机接收后更新账本；不会实际划款。`;
   return `收到：${draft.accountName}，${draft.type === 'income' ? '收入' : '支出'}${(draft.amountCents / 100).toFixed(2)}元。待手机同步，尚未入账；请打开 APK 自动接收。`;
 }
 export function receiveBookkeeping(state, receipts) {
@@ -84,7 +92,8 @@ export function receiveBookkeeping(state, receipts) {
       item.warnedVersion = item.version;
       state.bookkeepingDraft = { ...item };
       delete state.bookkeepingDraft.accountName;
-      replies.push('手机没有找到唯一匹配的账户，尚未入账。请回复“账户：APK 中的完整账户名”。');
+      if(item.type==='transfer'){delete state.bookkeepingDraft.fromAccount;delete state.bookkeepingDraft.toAccount;replies.push('手机没有找到唯一匹配的转账账户，尚未入账。先告诉我转出账户的完整名称。');}
+      else replies.push('手机没有找到唯一匹配的账户，尚未入账。请回复“账户：APK 中的完整账户名”。');
     }
   }
   return replies;

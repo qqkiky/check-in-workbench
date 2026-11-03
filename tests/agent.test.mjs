@@ -187,19 +187,46 @@ test('connection validation explains each missing field before sending any API r
  }finally{globalThis.fetch=original}
 });
 
-test('released speech calls AI once and automatically saves its schedule and calendar update',async()=>{
+test('released speech executes once and acknowledges without replaying the schedule',async()=>{
  const {fixture:f,service:a}=await load();const original=globalThis.fetch;let resolveSpeech,requests=0,complete;
  const done=new Promise(resolve=>{complete=resolve});const capture=new Promise(resolve=>{resolveSpeech=resolve});
  const config={url:'https://api.example/v1',key:'TEST_KEY',model:'test'};
  globalThis.fetch=async(_url,options)=>{
-  requests++;assert.equal(JSON.parse(options.body).messages.at(-1).content,'明天下午五点整理资料');
+  requests++;if(requests===2){assert.equal(JSON.parse(options.body).tools,undefined);return Response.json({choices:[{message:{content:'好，已安排好。'}}]});}assert.equal(JSON.parse(options.body).messages.at(-1).content,'明天下午五点整理资料');
   return Response.json({choices:[{message:{tool_calls:[{id:'voice-call',type:'function',function:{name:'workbench',arguments:JSON.stringify({action:'add_task',title:'整理资料',date:'2026-11-02',time:'17:00'})}}]}}]});
  };
  const voice=new a.HoldToTalk({status:async()=>({available:true,granted:true}),start:()=>capture,stop:async()=>{resolveSpeech({text:'明天下午五点整理资料'})},cancel:async()=>{},requestMicrophone:async()=>({granted:true})},{phase(){},error:message=>complete({error:message}),text:async text=>{try{complete(await a.chatWithAgent(config,{messages:[],entries:[]},text))}catch(error){complete({error})}}});
  try{
   await voice.press();assert.equal(requests,0);assert.equal(f.state.tasks.length,0);
-  voice.release();const result=await done;assert.ok(!result.error);assert.equal(requests,1);
+  voice.release();const result=await done;assert.ok(!result.error);assert.equal(requests,2);
   assert.equal(f.state.tasks.length,1);assert.equal(f.state.tasks[0].scheduledDate,'2026-11-02');assert.equal(f.state.tasks[0].scheduledTime,'17:00');assert.equal(f.calendar,1);
   assert.match(result.entries.at(-1).results[0].text,/已同步系统日历/);
  }finally{globalThis.fetch=original}
+});
+
+test('semantic task context and a follow-up pronoun operate the same item without sending notes or ledger contents',async()=>{
+ const {fixture:f,service:a}=await load(),original=globalThis.fetch;
+ f.state.tasks=[{id:'report',title:'撰写实验总结',recurrence:'none',scheduledDate:'2026-11-03',scheduledTime:'15:00',categoryId:'work',description:'PRIVATE_TASK_NOTE',createdAt:Date.now()}];
+ f.state.transactions=[{id:'private',note:'PRIVATE_LEDGER'}];let operations=0;
+ globalThis.fetch=async(_url,options)=>{
+  const body=JSON.parse(options.body),text=JSON.stringify(body);
+  assert.ok(!text.includes('PRIVATE_TASK_NOTE'));assert.ok(!text.includes('PRIVATE_LEDGER'));assert.ok(text.includes('撰写实验总结'));
+  if(!body.tools)return Response.json({choices:[{message:{content:operations===1?'好，已挪到明天，仍是下午三点。':'好，这件事已标记完成。'}}]});
+  operations++;const input=body.messages.at(-1).content;
+  assert.equal(input,operations===1?'把实验小结挪到明天':'这件事做完了');
+  return Response.json({choices:[{message:{tool_calls:[{id:'action-'+operations,type:'function',function:{name:'workbench',arguments:JSON.stringify(operations===1?{action:'update_task',query:'report',date:'2026-11-04'}:{action:'complete_task',query:'report'})}}]}}]});
+ };
+ try{
+  const config={url:'https://api.example/v1',key:'KEY',model:'MODEL'};
+  let history=await a.chatWithAgent(config,{messages:[],entries:[]},'把实验小结挪到明天');
+  assert.equal(f.state.tasks[0].scheduledDate,'2026-11-04');assert.equal(f.state.tasks[0].scheduledTime,'15:00');assert.equal(f.state.tasks.length,1);
+  history=await a.chatWithAgent(config,history,'这件事做完了');assert.equal(f.state.records.length,1);assert.equal(f.state.records[0].taskId,'report');assert.equal(operations,2);assert.match(history.entries.at(-1).text,/已标记完成/);
+ }finally{globalThis.fetch=original}
+});
+test('local habit rescheduling detaches just one occurrence and preserves later habits',async()=>{
+ const {fixture:f,service:a}=await load();const today=new Date();const day=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+ f.state.tasks=[{id:'habit',title:'锻炼',recurrence:'daily',scheduledTime:'20:00',categoryId:'life',createdAt:Date.now()-86400000}];
+ await a.executeWorkbench({action:'update_task',query:'habit',targetDate:day,date:'2026-12-01'});
+ assert.equal(f.state.tasks.length,2);const habit=f.state.tasks.find(task=>task.id==='habit'),moved=f.state.tasks.find(task=>task.id!=='habit');
+ assert.equal(habit.recurrence,'daily');assert.deepEqual(habit.excludedDates,[day]);assert.equal(moved.recurrence,'none');assert.equal(moved.scheduledDate,'2026-12-01');assert.equal(moved.scheduledTime,'20:00');
 });

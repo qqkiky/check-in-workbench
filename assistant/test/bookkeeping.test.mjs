@@ -17,8 +17,8 @@ test('speech transcripts support Chinese amounts and exact cents',()=>{
   assert.equal(bookkeepingInput('微信午饭支出三十二点五元').amountCents,3250);
   assert.equal(bookkeepingInput('支付宝收入一万二千零三元').amountCents,1200300);
 });
-test('ambiguous amounts, foreign currency and transfers cannot become an expense',()=>{
-  for(const text of ['微信午饭30元晚饭50元','微信支出20美元','微信转账30元','微信支出1.234元','微信支出-30元','微信支出30万元','2026-99-99微信支出30元'])assert.ok(bookkeepingInput(text).question);
+test('ambiguous amounts and foreign currency cannot become an expense',()=>{
+  for(const text of ['微信午饭30元晚饭50元','微信支出20美元','微信支出1.234元','微信支出-30元','微信支出30万元','2026-99-99微信支出30元'])assert.ok(bookkeepingInput(text).question);
 });
 test('amount and direction can be supplied through follow-up messages',()=>{
   const state={};

@@ -5,7 +5,9 @@ import { useStore } from '@/store'
 import type { Task, CheckInRecord } from '@/types'
 import { syncTasksToCalendar } from '@/capacitor/task-calendar'
 import { inboxTransaction, type BookkeepingItem } from './bookkeepingInbox'
+import { inboxTransfer } from './bookkeepingTransfer'
 import { assistantAgenda } from './assistantAgenda'
+import { applyTaskCommand } from './taskCommandInbox'
 import { dailyPending } from '../../assistant/src/dailyAgenda.mjs'
 import { fmtDate } from '@/utils/date'
 
@@ -65,15 +67,21 @@ async function request(config: AssistantConfig, path: string, data?: unknown) {
 }
 
 export async function syncBookkeeping(config: AssistantConfig) {
+  await flushPrivateStorage();useStore.getState().reload()
   const result = await request(config, '/v1/bookkeeping')
   if (!Array.isArray(result.items) || result.items.length > 100) throw new Error('待同步账目格式不正确')
   const local = useStore.getState()
-  const transactions = [...local.transactions]
+  const transactions = [...local.transactions],transfers=[...(local.transfers||[])]
   const imported: string[] = JSON.parse(appStorage.getItem(BOOKKEEPING_RECEIPTS) || '[]')
   const receipts: { id: string; version: number; status: 'applied' | 'account_required' }[] = []
   for (const item of result.items as BookkeepingItem[]) {
-    if (imported.includes(item.id) || transactions.some(transaction => transaction.id === item.id)) {
+    if (imported.includes(item.id) || transactions.some(transaction => transaction.id === item.id) || transfers.some(transfer=>transfer.id===item.id)) {
       receipts.push({id:item.id,version:item.version,status:'applied'}); continue
+    }
+    if(item.type==='transfer') {
+      const transfer=inboxTransfer(item,local.accounts)
+      if(!transfer){receipts.push({id:item.id,version:item.version,status:'account_required'});continue}
+      transfers.unshift(transfer);imported.push(item.id);receipts.push({id:item.id,version:item.version,status:'applied'});continue
     }
     const transaction = inboxTransaction(item,local.accounts,local.acctCategories)
     if (!transaction) { receipts.push({id:item.id,version:item.version,status:'account_required'}); continue }
@@ -83,10 +91,35 @@ export async function syncBookkeeping(config: AssistantConfig) {
   if (!receipts.length) return
   // Acknowledge only after the encrypted phone write succeeds, so network retries cannot lose a bill.
   appStorage.setItem('wb.acct.transactions.v1',JSON.stringify(transactions))
+  if(result.items.some((item:BookkeepingItem)=>item.type==='transfer'))appStorage.setItem('wb.acct.transfers.v1',JSON.stringify(transfers))
   appStorage.setItem(BOOKKEEPING_RECEIPTS,JSON.stringify(imported.slice(-2000)))
   await flushPrivateStorage()
   local.reload()
   await request(config,'/v1/bookkeeping/receipts',{receipts})
+}
+
+async function syncTaskCommands(config:AssistantConfig) {
+  await flushPrivateStorage();useStore.getState().reload()
+  const result=await request(config,'/v1/task-commands')
+  if(!Array.isArray(result.items)||result.items.length>100)throw new Error('微信待办调整格式不正确')
+  const state=useStore.getState(),tasks=[...state.tasks],records=[...state.records]
+  const saved=JSON.parse(appStorage.getItem('wb.assistant.task.receipts.v1')||'{}')
+  const receipts:{id:string;status:'applied'|'conflict'}[]=[]
+  for(const command of result.items) {
+    const status=saved[command.id]|| (applyTaskCommand(tasks,records,command)?'applied':'conflict')
+    saved[command.id]=status;receipts.push({id:command.id,status})
+  }
+  if(receipts.length) {
+    storage.setTasks(tasks);storage.setRecords(records)
+    appStorage.setItem('wb.assistant.task.receipts.v1',JSON.stringify(Object.fromEntries(Object.entries(saved).slice(-2000))))
+    await flushPrivateStorage();state.reload()
+  }
+  return receipts
+}
+export async function controlWeixin(action:'pause'|'resume'|'disconnect') {
+  const config=readAssistantConfig()
+  if(!config)throw new Error('请先配置微信助手连接')
+  return request(config,'/v1/weixin/control',{action})
 }
 
 let busy = false
@@ -116,6 +149,7 @@ export async function syncAssistant() {
   if (busy) throw new Error('正在同步，请稍候')
   busy = true
   try {
+    const commandReceipts=await syncTaskCommands(config)
     const store = useStore.getState()
     let meta: Record<string, TaskMeta> = JSON.parse(appStorage.getItem(META_KEY) || '{}')
     const payloads = store.tasks.map(task => schedulePayload(task,store.records)).filter(Boolean)
@@ -169,6 +203,7 @@ export async function syncAssistant() {
     await syncBookkeeping(config)
     await syncTasksToCalendar(tasks,records)
     await syncAssistantAgenda(config)
+    if(commandReceipts.length)await request(config,'/v1/task-commands/receipts',{receipts:commandReceipts})
     const current=useStore.getState()
     const todayCount=dailyPending(remote.tasks,assistantAgenda(current.tasks,current.records),fmtDate(new Date())).length
     return { count:remote.tasks.length as number, todayCount, deliveryError:!!remote.deliveryError, connected:!!remote.connected }

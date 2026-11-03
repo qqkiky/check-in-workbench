@@ -1,11 +1,12 @@
 import { validDate, safeTask } from './domain.mjs';
+import { conversationTasks } from './taskCommands.mjs';
 
 export function activeDraft(state, now=Date.now()) {
   return state.scheduleDraft && now-state.scheduleDraft.updatedAt < 86400000 ? state.scheduleDraft : null;
 }
 export function activeFocus(state, now=Date.now()) {
   const focus=state.scheduleFocus;
-  return focus && now-focus.updatedAt<15*60000 ? state.tasks.find(task=>task.id===focus.id && task.status==='pending') || null : null;
+  return focus && now-focus.updatedAt<15*60000 ? conversationTasks(state,now).find(task=>task.id===focus.id && task.status==='pending') || null : null;
 }
 export function rememberFocus(state, before, after, now=Date.now()) {
   const changed=after.filter(task=>task.status==='pending' && !before.some(previous=>previous.id===task.id && previous.version===task.version));
@@ -57,6 +58,19 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
   if(draft?.items.length===1 && nextDraft?.items.length===1 && nextDraft.items[0].title)nextDraft.items[0].title=correctedTitle(draft.items[0].title,nextDraft.items[0].title,text);
   const ready=(nextDraft?.items || []).filter(item=>item.title && item.date && item.time);
   let actions=value.actions.map(action=>{
+    if(action.type==='transfer') {
+      const clean={type:'transfer'};
+      for(const key of ['fromAccount','toAccount','note'])if(action[key]!==undefined) {
+        if(typeof action[key]!=='string'||!action[key].trim()||action[key].length>(key==='note'?200:60))throw new Error('invalid_transfer');
+        clean[key]=action[key].trim();
+      }
+      for(const key of ['amountCents','feeCents'])if(action[key]!==undefined) {
+        if(!Number.isSafeInteger(action[key])||action[key]<(key==='feeCents'?0:1)||action[key]>1e12)throw new Error('invalid_transfer_amount');
+        clean[key]=action[key];
+      }
+      if(action.date!==undefined){if(!validDate(action.date))throw new Error('invalid_transfer_date');clean.date=action.date;}
+      return clean;
+    }
     if (action.type==='create') {
       const task=safeTask({...action,id:'validation',status:'pending'});
       return {type:'create',title:task.title,date:task.date,time:task.time,duration:task.duration};
@@ -70,7 +84,7 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
       if(!matches.length)matches=tasks.filter(task=>task.status==='pending' && text.includes(task.title));
       if(changes.title && matches.length===1)changes.title=correctedTitle(matches[0].title,changes.title,text);
       const task=safeTask({id:'validation',title:'修改',date:'2000-01-01',time:'00:00',status:'pending',...changes});
-      return {type:'update',query:matches.length===1?matches[0].id:action.query.slice(0,200),...Object.fromEntries(Object.keys(changes).map(key=>[key,task[key]]))};
+      return {type:'update',query:matches.length===1?matches[0].id:action.query.slice(0,200),...(action.targetDate&&validDate(action.targetDate)?{targetDate:action.targetDate}:{}),...Object.fromEntries(Object.keys(changes).map(key=>[key,task[key]]))};
     }
     if (['complete','cancel','reschedule'].includes(action.type) && typeof action.query==='string') {
       if(action.type==='reschedule')safeTask({...action,id:'validation',title:'改期',status:'pending'});
@@ -82,7 +96,7 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
       if(action.type==='reschedule' && unfinished.length===1 && !tasks.some(task=>task.status==='pending' && task.title.includes(action.query))) {
         return {type:'create',title:unfinished[0].title,date:action.date,time:action.time,duration:30};
       }
-      return {type:action.type,query:action.query.slice(0,200),...(action.type==='reschedule'?{date:action.date,time:action.time}:{})};
+      return {type:action.type,query:action.query.slice(0,200),...(action.type==='reschedule'?{date:action.date,time:action.time}:action.date&&validDate(action.date)?{date:action.date}:{})};
     }
     throw new Error('invalid_action');
   });
@@ -94,6 +108,7 @@ export function cleanInterpretation(value, now=Date.now(), draft=null, tasks=[],
     if(!nextDraft.items.length){nextDraft=null;actions=actions.filter(action=>action.type!=='clarify');}
   }
   if(actions.length>10)throw new Error('too_many_actions');
+  if(actions.some(action=>action.type==='transfer')&&actions.length!==1)throw new Error('mixed_transfer');
   if(draft?.items.length===1 && nextDraft?.items.length===1 && draft.items[0].title!==nextDraft.items[0].title) {
     for(const action of actions)if(action.type==='clarify' && !action.question.includes(nextDraft.items[0].title))action.question=`已更正为“${nextDraft.items[0].title}”。${action.question}`;
   }

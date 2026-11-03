@@ -85,7 +85,13 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
     if(recurrence==='weekly'&&(!patch.weekdays?.length||patch.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
     if(recurrence==='monthly'&&(!Number.isInteger(patch.monthDay)||patch.monthDay!<1||patch.monthDay!>31))throw new Error('请明确每月几号')
     label=`${patch.scheduledDate||'日期未定'} ${patch.scheduledTime||'时间未定'} ${patch.title}`;calendar=true
-    run=current?()=>s.updateTask(current.id,patch):()=>s.addTask({...patch,categoryId:'work',reminderLead:0} as Omit<Task,'id'|'createdAt'|'updatedAt'>)
+    if(current&&current.recurrence!=='none'&&args.date&&args.date!==(args.targetDate||today)) {
+      const day=args.targetDate||today
+      if(!taskOccursOnDate(current,new Date(day+'T00:00:00')))throw new Error('原日期没有这项习惯，请明确要移动哪一天')
+      if(s.records.some(record=>record.taskId===current.id&&record.date===day))throw new Error('这一次已经完成，请明确要移动哪一天的未完成习惯')
+      const {id,createdAt,updatedAt,...base}=current
+      run=()=>{s.updateTask(current.id,{excludedDates:[...new Set([...(current.excludedDates||[]),day])]});s.addTask({...base,...patch,recurrence:'none',weekdays:undefined,monthDay:undefined,excludedDates:[],isQuick:false} as Omit<Task,'id'|'createdAt'|'updatedAt'>)}
+    } else run=current?()=>s.updateTask(current.id,patch):()=>s.addTask({...patch,categoryId:'work',reminderLead:0} as Omit<Task,'id'|'createdAt'|'updatedAt'>)
   } else if(args.action==='complete_task'||args.action==='update_completion_time'||args.action==='reopen_task') {
     if(args.action==='reopen_task'&&(args.time||args.completedTime||args.completedDate))throw new Error('修改完成时间请使用 update_completion_time；本次保留已完成状态')
     const task=selectTask(), taskRecords=s.records.filter(item=>item.taskId===task.id)
@@ -179,5 +185,5 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
     if(!isCalendarSyncEnabled())calendarText='；尚未开启系统日历同步'
     else try{const latest=useStore.getState();await syncTasksToCalendar(latest.tasks,latest.records);calendarText=untimedTask?'；补充具体时间后写入系统日历':'；已同步系统日历'}catch{calendarText='；日历同步暂未成功，请检查日历权限'}
   }
-  return {text:`${args.action.startsWith('delete_')?'已删除':args.action==='complete_task'?'已完成':args.action==='reopen_task'?'已恢复待办':'已保存'}：${label}${calendarText}`,modelStatus:'操作已在本机保存'+(calendarText?'，日历状态已向用户显示':'')}
+  return {text:`${args.action.startsWith('delete_')?'已删除':args.action==='complete_task'?'已完成':args.action==='reopen_task'?'已恢复待办':'已保存'}：${label}${calendarText}`,modelStatus:'操作已在本机保存'+(calendar?`：${label}`:'')+(calendarText?'，日历状态已向用户显示':'')}
 }
