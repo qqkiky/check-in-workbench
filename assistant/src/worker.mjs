@@ -143,8 +143,9 @@ async function poll(env) {
       if (!id || state.seen.includes(id)) continue;
       if(handled>=3){fullyHandled=false;break;}
       const text = (message.item_list || []).map(item => item.text_item?.text || item.voice_item?.text || '').join('\n').trim().slice(0,2000);
-      const finance = text ? bookkeepingInput(text,state.bookkeepingDraft) : null;
-      const parsed = finance&&!finance.transfer ? null : text ? await parseMessage(env,state,text) : {actions:[{type:'clarify',question:'这条语音没有收到转写文字，请补发文字；日程请说明任务和时间，记账请说明账户、收入或支出及金额。'}]};
+      const followup=text?followupActions(state,text):null;
+      const finance = text&&!followup ? bookkeepingInput(text,state.bookkeepingDraft) : null;
+      const parsed = followup || (finance&&!finance.transfer ? null : text ? await parseMessage(env,state,text) : {actions:[{type:'clarify',question:'这条语音没有收到转写文字，请补发文字；日程请说明任务和时间，记账请说明账户、收入或支出及金额。'}]});
       await mutate(env,s => {
         if (s.botToken!==pollToken || s.seen.includes(id)) return;
         const beforeTasks=s.tasks.map(task=>({...task}));
@@ -156,10 +157,12 @@ async function poll(env) {
           result.reply=rows.length?`${day} 的未完成安排（${rows.length}项）：\n${agendaLines(rows)}`:`${day} 还没有未完成日程。`;
         }
         if(isFinance || parsed.actions.some(action=>action.type==='list') || parsed.draft)delete s.scheduleFocus;
-        else if(result.focusId)s.scheduleFocus={id:result.focusId,date:result.focusDate,updatedAt:Date.now()};
+        else if(result.focusId||followup?.focusId)s.scheduleFocus={id:result.focusId||followup.focusId,date:result.focusDate||followup?.focusDate,updatedAt:Date.now()};
         else rememberFocus(s,beforeTasks,result.tasks);
         if(parsed && parsed.draft!==undefined){if(parsed.draft)s.scheduleDraft=parsed.draft;else delete s.scheduleDraft;}
         s.tasks = result.tasks;
+        const bill=s.bookkeepingDraft;
+        if(!isFinance&&(result.focusId&&parsed.actions.some(action=>action.type==='complete')||followup?.focusId)&&bill&&bill.amountCents===undefined&&!bill.type&&!bill.accountName&&!bill.fromAccount&&!bill.toAccount&&/(做完|完成|勾选|打卡)/.test(bill.note||''))delete s.bookkeepingDraft;
         s.outbox=s.outbox.filter(out=>!out.key.startsWith('reminder-') || s.tasks.some(t=>t.status==='pending' && out.key.startsWith(`reminder-${t.id}-`)));
         s.seen = [...s.seen,id].slice(-1000);
         if (message.context_token) s.contextToken = message.context_token;

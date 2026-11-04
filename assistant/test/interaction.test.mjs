@@ -157,3 +157,64 @@ test('querying unfinished items or explicitly forbidding undo cannot authorize a
   try{await poll(f.env);assert.equal((await f.read()).tasks[0].status,'completed');}finally{globalThis.fetch=original}
  }
 });
+
+test('voice completion of the bookkeeping habit is a task action and never opens a financial draft',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});const seed=initial();seed.agenda.tasks.push({...habit,id:'bookkeeping-task',title:'记账',time:'23:00'});
+ const f=await fixture(seed),original=globalThis.fetch;let delivered=false;
+ globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:delivered?[]:(delivered=true,[{from_user_id:'OWNER',message_type:1,message_id:'bookkeeping-habit',context_token:'CTX',item_list:[{voice_item:{text:'今天的记账做完了。'}}]}])}):Response.json({ret:0});
+ try {await poll(f.env);const state=await f.read();assert.equal(state.bookkeepingDraft,undefined);assert.equal((state.bookkeeping||[]).length,0);assert.ok(effectiveAgenda(state).find(task=>task.id==='bookkeeping-task').completedDates.includes('2026-11-03'));assert.deepEqual(effectiveAgenda(state).find(task=>task.id===habit.id).completedDates,[]);}
+ finally{globalThis.fetch=original}
+});
+
+test('explicit task correction clears an empty mistaken bill but preserves a genuine incomplete bill',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});
+ for(const meaningful of [false,true]) {
+  const seed=initial();seed.agenda.tasks.push({...habit,id:'bookkeeping-task',title:'记账',time:'23:00'});
+  const old=meaningful?{id:'wxbook-real',date:'2026-11-03',createdAt:at,amountCents:3000,type:'expense',note:'午饭'}:{id:'wxbook-mistake',date:'2026-11-03',createdAt:at,note:'的做完了'};
+  seed.bookkeepingDraft=structuredClone(old);const f=await fixture(seed),original=globalThis.fetch;
+  globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'clarify-task',context_token:'CTX',item_list:[{voice_item:{text:'你就把记账这件事勾选了就。'}}]}]}):Response.json({ret:0});
+  try{await poll(f.env);const state=await f.read();assert.ok(effectiveAgenda(state).find(task=>task.id==='bookkeeping-task').completedDates.includes('2026-11-03'));if(meaningful)assert.deepEqual(state.bookkeepingDraft,old);else assert.equal(state.bookkeepingDraft,undefined);assert.equal((state.bookkeeping||[]).length,0);}
+  finally{globalThis.fetch=original}
+ }
+});
+test('an actual expense containing the word bookkeeping remains financial and never checks off the habit',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});const seed=initial();seed.agenda.tasks.push({...habit,id:'bookkeeping-task',title:'记账',time:'23:00'});
+ const f=await fixture(seed),original=globalThis.fetch;
+ globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'real-expense',context_token:'CTX',item_list:[{text_item:{text:'微信午饭支出30元，记账完成了'}}]}]}):Response.json({ret:0});
+ try{await poll(f.env);const state=await f.read();assert.equal(state.bookkeeping.length,1);assert.equal(state.bookkeeping[0].amountCents,3000);assert.equal(state.bookkeeping[0].type,'expense');assert.deepEqual(effectiveAgenda(state).find(task=>task.id==='bookkeeping-task').completedDates,[]);}
+ finally{globalThis.fetch=original}
+});
+test('natural rejection of the previous bill clears only that draft instead of cancelling a task',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});const seed=initial();seed.bookkeepingDraft={id:'wxbook-mistake',createdAt:at,date:'2026-11-03',note:'的做完了'};
+ const f=await fixture(seed),original=globalThis.fetch;
+ globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'cancel-draft',context_token:'CTX',item_list:[{voice_item:{text:'不接上一笔了，去。'}}]}]}):Response.json({ret:0});
+ try{await poll(f.env);const state=await f.read();assert.equal(state.bookkeepingDraft,undefined);assert.deepEqual(state.tasks,seed.tasks);assert.deepEqual(state.agenda,seed.agenda);}
+ finally{globalThis.fetch=original}
+});
+test('duplicate bookkeeping task names are clarified without opening a bill or checking either item',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});const seed=initial();seed.agenda.tasks.push({...habit,id:'book-a',title:'记账',time:'22:00'},{...habit,id:'book-b',title:'记账',time:'23:00'});
+ const f=await fixture(seed),original=globalThis.fetch,sent=[];
+ globalThis.fetch=async(url,options)=>{if(String(url).endsWith('/getupdates'))return Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'duplicate-task',context_token:'CTX',item_list:[{text_item:{text:'今天的记账做完了'}}]}]});sent.push(JSON.parse(options.body).msg.item_list[0].text_item.text);return Response.json({ret:0});};
+ try{await poll(f.env);const state=await f.read();assert.equal(state.bookkeepingDraft,undefined);assert.ok(sent.some(text=>text.includes('多项同名')));assert.deepEqual(effectiveAgenda(state).find(task=>task.id==='book-a').completedDates,[]);assert.deepEqual(effectiveAgenda(state).find(task=>task.id==='book-b').completedDates,[]);}
+ finally{globalThis.fetch=original}
+});
+test('repeating an already-completed bookkeeping habit keeps the reference and clears only a mistaken empty draft',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});const seed=initial();seed.agenda.tasks.push({...habit,id:'book-done',title:'记账',time:'23:00',completedDates:['2026-11-03'],completed:true});seed.bookkeepingDraft={id:'wxbook-mistake',createdAt:at,date:'2026-11-03',note:'的做完了'};
+ const f=await fixture(seed),original=globalThis.fetch;
+ globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'already-done',context_token:'CTX',item_list:[{text_item:{text:'今天的记账做完了'}}]}]}):Response.json({ret:0});
+ try{await poll(f.env);const state=await f.read();assert.equal(state.bookkeepingDraft,undefined);assert.equal(state.scheduleFocus.id,'book-done');assert.deepEqual(effectiveAgenda(state).find(task=>task.id==='book-done').completedDates,['2026-11-03']);}
+ finally{globalThis.fetch=original}
+});
+
+test('bookkeeping task completion and immediate undo keep one reference after recovering from the mistaken bill draft',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});const seed=initial();seed.agenda.tasks.push({...habit,id:'book-task',title:'记账',time:'23:00'});seed.bookkeepingDraft={id:'wxbook-mistake',createdAt:at,date:'2026-11-03',note:'的做完了'};
+ const f=await fixture(seed),original=globalThis.fetch;let delivered=false;
+ globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:delivered?[]:(delivered=true,['今天的记账做完了。','我搞错了其实这件事没做完'].map((text,index)=>({from_user_id:'OWNER',message_type:1,message_id:'book-flow-'+index,context_token:'CTX',item_list:[{voice_item:{text}}]})))}):Response.json({ret:0});
+ try{await poll(f.env);const state=await f.read();assert.equal(state.bookkeepingDraft,undefined);assert.equal((state.bookkeeping||[]).length,0);assert.deepEqual(state.taskCommands.map(command=>command.action.type),['complete','reopen']);assert.deepEqual(effectiveAgenda(state).find(task=>task.id==='book-task').completedDates,[]);assert.equal(effectiveAgenda(state).find(task=>task.id==='book-task').time,'23:00');assert.equal(state.scheduleFocus.id,'book-task');}
+ finally{globalThis.fetch=original}
+});
+test('an ambiguous bookkeeping acknowledgement does not override a genuine financial follow-up',()=>{
+ const state=initial();state.agenda.tasks.push({...habit,id:'book-task',title:'记账'});state.bookkeepingDraft={id:'wxbook-real',createdAt:at,amountCents:3000,type:'expense',note:'午饭'};
+ assert.equal(followupActions(state,'记账完成了',at),null);
+ assert.equal(followupActions(state,'今天的记账做完了',at).actions[0].query,'book-task');
+});

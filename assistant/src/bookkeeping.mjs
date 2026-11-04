@@ -7,6 +7,9 @@ export function expireBookkeeping(state, now = Date.now()) {
   if (state.bookkeepingDraft && now - state.bookkeepingDraft.createdAt >= RETENTION_MS) delete state.bookkeepingDraft;
 }
 export function bookkeepingInput(text, draft) {
+  const plain=text.replace(/[\s，,。！!？?]/g,'');
+  if((draft&&/^(取消|不记了|取消记账)$/.test(plain))||/^(?:不(?:再)?(?:接|记)(?:上|这|那)一笔(?:了)?|(?:上|这|那)一笔(?:不(?:接|记)(?:了)?|取消(?:了)?)|取消(?:上|这|那)一笔|(?:上|这|那)一笔(?:不要|别)记(?:了)?)(?:吧|去|就|啊)?$/.test(plain))return {cancel:true};
+  if(/任务|待办|这件事|勾选|打卡/.test(text)&&!/[¥￥]|[0-9零〇一二两三四五六七八九十百千万]+(?:[.点][0-9零一二三四五六七八九]+)?(?:元|块)|(?:收入|支出|付了|支付|转账|还款).{0,8}[0-9零〇一二两三四五六七八九十百千万]/.test(text))return null;
   if(/提醒我|待办|日程|安排/.test(text)&&!/已经|已还|还了|付了|支付了/.test(text))return null;
   if(/转账|还款|还.{0,20}(信用卡|欠款)|信用卡.{0,12}欠款/.test(text)
     ||draft?.type==='transfer'&&(/^(?:转出账户|转入账户|从账户|到账户|金额|手续费|账户)[:：是为]|^\s*[0-9零〇一二两三四五六七八九十百千万]+(?:[.点][0-9零一二三四五六七八九]+)?\s*(?:元|块钱|块)?[。！!]*$/.test(text)))return {transfer:true};

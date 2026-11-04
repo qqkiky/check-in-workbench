@@ -1,4 +1,4 @@
-import { validDate, safeTask, reopenRequested } from './domain.mjs';
+import { validDate, safeTask, reopenRequested, cstDay } from './domain.mjs';
 import { conversationTasks } from './taskCommands.mjs';
 
 export function activeDraft(state, now=Date.now()) {
@@ -20,6 +20,19 @@ export function followupActions(state,text,now=Date.now()) {
     || /^(?:撤销|取消)(?:刚才的)?(?:完成|打卡)(?:状态)?$/.test(plain)
     || /^(?:把)?(?:这件事|这项任务|它|这个)(?:恢复|改回|标为)(?:成|为)?(?:未完成|待办)$/.test(plain);
   if(focus&&correction&&reopenRequested(text))return focus.status==='completed'?{actions:[{type:'reopen',query:focus.id,date:focus.date}]}:{actions:[{type:'clarify',question:`「${focus.title}」目前就是未完成，原计划未变。`}]};
+  const named=plain.match(/^(?:请|麻烦)?(?:你|您|我)?(?:就|已经)?(?:把|将)?(?:(今天|今日|昨天|明天|后天|\d{4}-\d{2}-\d{2})(?:的)?)?(.+?)(?:这件事|这项任务|这项待办|任务|待办)?(?:已经|已)?(?:做完了?|完成了?|搞定了?|勾选(?:完成)?(?:了)?(?:就)?|打卡(?:完成)?(?:了)?)(?:就|吧|了|啊|啦|呢)?$/);
+  const money=/(?:[¥￥]\s*[0-9零〇一二两三四五六七八九十百千万]|[0-9零〇一二两三四五六七八九十百千万]+(?:[.点][0-9零一二三四五六七八九]+)?(?:元|块|美元|港币)|(?:收入|支出|花了|付了|支付|转账|还款).{0,8}[0-9零〇一二两三四五六七八九十百千万])/.test(plain);
+  const bill=state.bookkeepingDraft,meaningfulBill=bill&&(bill.amountCents!==undefined||bill.type||bill.accountName||bill.fromAccount||bill.toAccount);
+  if(named&&(!meaningfulBill||named[1]||/任务|待办|这件事|勾选|打卡/.test(plain))&&!money&&!reopenRequested(text)&&!/(不要|别|不用|不必|不能).*(完成|做完|勾选|打卡)/.test(plain)) {
+    const offset={今天:0,今日:0,昨天:-1,明天:1,后天:2}[named[1]],day=named[1]&&offset===undefined?named[1]:cstDay(now+(offset||0)*86400000);
+    if(validDate(day)) {
+      const query=named[2].replace(/^[“「『"']|[”」』"']$/g,'');
+      const tasks=conversationTasks(state,now,day).filter(task=>['pending','completed'].includes(task.status));
+      const exact=tasks.filter(task=>task.id===query||task.title===query),matches=exact.length?exact:tasks.filter(task=>task.title.includes(query));
+      if(matches.length>1)return {actions:[{type:'clarify',question:'找到多项同名待办，请补充完整名称或日期：'+matches.map(task=>task.date+' '+task.time+' '+task.title).join('；')}]};
+      if(matches.length===1)return {actions:matches[0].status==='completed'?[{type:'clarify',question:`「${matches[0].title}」已完成，不需要重复勾选。`}]:[{type:'complete',query:matches[0].id,date:day}],focusId:matches[0].id,focusDate:matches[0].date||day};
+    }
+  }
   if(focus?.status==='completed')return null;
   const item=draft?.items.length===1?draft.items[0]:focus;
   if(!item?.title || !item.date)return null;
