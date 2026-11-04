@@ -123,6 +123,7 @@ export async function controlWeixin(action:'pause'|'resume'|'disconnect') {
 }
 
 let busy = false
+let syncFinished: (()=>void) | undefined
 export async function syncAssistantAgenda(config:AssistantConfig) {
   const state=useStore.getState()
   if(!state.initialized)throw new Error('本机数据尚未读取完成，请稍后同步')
@@ -141,7 +142,7 @@ export async function syncAssistantAgenda(config:AssistantConfig) {
 export function lockAssistantForDataSync() {
   if(busy)throw new Error('微信日程正在同步，请稍后再进行全量数据同步')
   busy=true
-  return ()=>{busy=false}
+  return ()=>{busy=false;syncFinished?.()}
 }
 export async function syncAssistant() {
   const config = readAssistantConfig()
@@ -200,14 +201,14 @@ export async function syncAssistant() {
     appStorage.setItem(META_KEY,JSON.stringify(meta))
     await flushPrivateStorage()
     latest.reload()
-    await syncBookkeeping(config)
-    await syncTasksToCalendar(tasks,records)
     await syncAssistantAgenda(config)
     if(commandReceipts.length)await request(config,'/v1/task-commands/receipts',{receipts:commandReceipts})
+    await syncBookkeeping(config)
+    await syncTasksToCalendar(tasks,records)
     const current=useStore.getState()
     const todayCount=dailyPending(remote.tasks,assistantAgenda(current.tasks,current.records),fmtDate(new Date())).length
     return { count:remote.tasks.length as number, todayCount, deliveryError:!!remote.deliveryError, connected:!!remote.connected }
-  } finally { busy=false }
+  } finally { busy=false;syncFinished?.() }
 }
 
 let started = false
@@ -216,14 +217,35 @@ export function initAssistantSync() {
   started=true
   if(Capacitor.getPlatform()==='android')void NativeAssistant.configure({enabled:!!readAssistantConfig()?.enabled}).catch(()=>{})
   let timer: ReturnType<typeof setTimeout> | undefined
-  const schedule=()=>{
-    if(!readAssistantConfig()?.enabled || busy)return
-    clearTimeout(timer)
-    timer=setTimeout(()=>void syncAssistant().catch(()=>{}),2000)
+  let pending=false
+  const snapshot=()=>{const state=useStore.getState();return JSON.stringify([state.tasks.map(task=>schedulePayload(task,state.records)).filter(Boolean),assistantAgenda(state.tasks,state.records)])}
+  let previous=snapshot()
+  const run=()=>{
+    clearTimeout(timer);timer=undefined
+    if(!readAssistantConfig()?.enabled)return
+    if(busy){pending=true;return}
+    pending=false
+    void syncAssistant().catch(()=>{})
   }
-  useStore.subscribe(schedule)
+  const schedule=()=>{
+    if(!readAssistantConfig()?.enabled)return
+    clearTimeout(timer);timer=undefined
+    if(busy){pending=true;return}
+    timer=setTimeout(run,300)
+  }
+  syncFinished=()=>{
+    if(pending){pending=false;if(document.visibilityState==='hidden')run();else schedule()}
+  }
+  useStore.subscribe(()=>{
+    const next=snapshot()
+    if(next===previous)return
+    previous=next;schedule()
+  })
   window.addEventListener('online',schedule)
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')schedule()})
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible')schedule()
+    else if(timer!==undefined||pending)run()
+  })
   setInterval(()=>{if(document.visibilityState==='visible')schedule()},60000)
   schedule()
 }
