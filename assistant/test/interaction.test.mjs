@@ -218,3 +218,30 @@ test('an ambiguous bookkeeping acknowledgement does not override a genuine finan
  assert.equal(followupActions(state,'记账完成了',at),null);
  assert.equal(followupActions(state,'今天的记账做完了',at).actions[0].query,'book-task');
 });
+
+test('spoken self-corrections with or without I restore the focused task and never guess a missing or different target',()=>{
+ const done={...task,status:'completed',completedAt:at},state={tasks:[done],scheduleFocus:{id:done.id,date:done.date,updatedAt:at}};
+ for(const text of ['搞错了，其实这件事没做完','说错了，这件事其实没做完','我搞错了，其实这件事没做完']) {
+  assert.deepEqual(followupActions(state,text,at+100)?.actions,[{type:'reopen',query:done.id,date:done.date}]);
+  assert.equal(followupActions({tasks:[done]},text,at+100),null);
+ }
+ for(const text of ['搞错了，另一件事没做完','搞错了，不是没完成，是完成时间说错了'])assert.equal(followupActions(state,text,at+100),null);
+});
+
+test('spoken correction retains the bookkeeping habit reference after the phone receives completion and uploads its agenda',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:at});const seed=initial();seed.agenda.tasks.push({...habit,id:'book-roundtrip',title:'记账',time:'23:00'});
+ const f=await fixture(seed),original=globalThis.fetch;let step=0;const messages=['今天的记账做完了。','搞错了，其实这件事没做完'];
+ globalThis.fetch=async(url)=>String(url).endsWith('/getupdates')?Response.json({msgs:[{from_user_id:'OWNER',message_type:1,message_id:'roundtrip-'+step,context_token:'CTX',item_list:[{voice_item:{text:messages[step++]}}]}]}):Response.json({ret:0});
+ try {
+  await poll(f.env);let state=await f.read();const agenda=effectiveAgenda(state);
+  const request=async(path,body)=>worker.fetch(new Request('https://test.workers.dev'+path,{method:'POST',headers:{Authorization:'Bearer DEVICE'},body:JSON.stringify(body)}),f.env);
+  assert.equal((await request('/v1/agenda',{baseVersion:state.agenda.version,tasks:agenda})).status,200);
+  assert.equal((await request('/v1/task-commands/receipts',{receipts:state.taskCommands.map(command=>({id:command.id,status:'applied'}))})).status,200);
+  state=await f.read();assert.equal(activeFocus(state,at).status,'completed');assert.equal(state.taskCommands.length,0);
+  await poll(f.env);state=await f.read();
+  assert.deepEqual(state.taskCommands.map(command=>command.action.type),['reopen']);
+  const updated=effectiveAgenda(state).find(row=>row.id==='book-roundtrip');
+  assert.deepEqual(updated.completedDates,[]);assert.equal(updated.time,'23:00');assert.equal(updated.date,'');assert.equal(updated.recurrence,'daily');
+  assert.deepEqual(state.tasks,seed.tasks);assert.deepEqual(effectiveAgenda(state).find(row=>row.id===habit.id),habit);assert.equal(state.bookkeepingDraft,undefined);
+ }finally{globalThis.fetch=original}
+});

@@ -16,7 +16,7 @@ export function rememberFocus(state, before, after, now=Date.now()) {
 export function followupActions(state,text,now=Date.now()) {
   const draft=activeDraft(state,now),focus=draft?null:activeFocus(state,now);
   const plain=text.replace(/[\s，,。！!？?]/g,'');
-  const correction=/^(?:(?:我搞错了|我说错了|刚才说错了|其实|不对|等等|等一下|不好意思|啊|哦|嗯))*(?:这件事|这项任务|这个任务|刚才那件事|刚才那项|它|这个)?(?:其实|还|确实)?(?:没(?:有)?(?:做完|完成|弄完|搞定)|未完成)(?:呢|啊|呀|的)?$/.test(plain)
+  const correction=/^(?:(?:(?:我)?(?:搞错了|说错了)|刚才说错了|其实|不对|等等|等一下|不好意思|啊|哦|嗯))*(?:这件事|这项任务|这个任务|刚才那件事|刚才那项|它|这个)?(?:其实|还|确实)?(?:没(?:有)?(?:做完|完成|弄完|搞定)|未完成)(?:呢|啊|呀|的)?$/.test(plain)
     || /^(?:撤销|取消)(?:刚才的)?(?:完成|打卡)(?:状态)?$/.test(plain)
     || /^(?:把)?(?:这件事|这项任务|它|这个)(?:恢复|改回|标为)(?:成|为)?(?:未完成|待办)$/.test(plain);
   if(focus&&correction&&reopenRequested(text))return focus.status==='completed'?{actions:[{type:'reopen',query:focus.id,date:focus.date}]}:{actions:[{type:'clarify',question:`「${focus.title}」目前就是未完成，原计划未变。`}]};
