@@ -91,3 +91,22 @@ test('a future-start habit in an adopted plan has no reminders before its confir
  await api.acceptProposal(api.readProposals()[0].id);ctx.values.set('wb.coach.reminders.v1',JSON.stringify({enabled:true}));
  const events=api.reminderEvents(new Date(date()+'T08:00:00'));assert.ok(events.length>0);assert.ok(events.every(event=>event.date>=day));
 });
+
+test('confirmed goal splitting and linked plan track real completion without rewriting the source memory',async()=>{
+ const {ctx,api}=await fixture()
+ await api.saveMemory({kind:'goal',content:'坚持运动并完成文章'})
+ const memory=api.readMemories()[0]
+ await api.proposeCoach({action:'suggest_goals',goals:[{sourceMemoryId:memory.id,title:'坚持运动'},{sourceMemoryId:memory.id,title:'完成文章'}]})
+ assert.equal(api.readGoals().length,0)
+ await api.acceptProposal(api.readProposals()[0].id)
+ const goal=api.readGoals().find(row=>row.title==='坚持运动')
+ assert.equal(api.readMemories()[0].content,'坚持运动并完成文章')
+ assert.equal(api.readGoals().length,2)
+ await api.proposeCoach({action:'suggest_plan',goalId:goal.id,items:[{title:'练习10分钟',date:date(),time:'20:00',recurrence:'daily'}]})
+ assert.equal(ctx.state.tasks.length,0)
+ await api.acceptProposal(api.readProposals()[0].id)
+ const linked=api.readGoals().find(row=>row.id===goal.id)
+ assert.deepEqual(api.goalProgress(linked),{linked:1,completed:0,days:0})
+ ctx.state.records=[{taskId:linked.taskIds[0],date:date()},{taskId:'unrelated',date:date()}]
+ assert.deepEqual(api.goalProgress(linked),{linked:1,completed:1,days:1})
+})

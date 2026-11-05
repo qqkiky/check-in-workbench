@@ -81,7 +81,8 @@ function MiniDonut({ data, centerLabel, centerValue }: { data: PieDatum[]; cente
   )
 }
 
-export function AccountingScreen() {
+export function AccountingScreen({compact=false}:{compact?:boolean}) {
+  const [filtersOpen,setFiltersOpen]=useState(false)
   const { transactions, acctCategories, accounts, settings, transfers } = useStore()
   const addTransaction = useStore((s) => s.addTransaction)
   const updateTransaction = useStore((s) => s.updateTransaction)
@@ -260,7 +261,7 @@ export function AccountingScreen() {
   const totalBalance = accounts.reduce((s, a) => s + (balances[a.id] ?? 0), 0)
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={"account-screen flex flex-col min-h-0 h-full "+(compact?"account-compact":"")}>
       {/* 头部 */}
       <header className="px-4 pt-3 pb-2 bg-[#F2F2F7]">
         <div className="flex items-center justify-between mb-3">
@@ -294,7 +295,7 @@ export function AccountingScreen() {
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl p-3 shadow-card grid grid-cols-3 gap-2">
+        <div className="account-summary bg-white rounded-2xl p-3 shadow-card grid grid-cols-3 gap-2">
           <div className="text-center">
             <div className="text-xl font-bold text-green-600">{formatMoney(monthSummary.income)}</div>
             <div className="text-[11px] text-gray-500 mt-0.5">收入</div>
@@ -330,7 +331,7 @@ export function AccountingScreen() {
 
       <div className="flex-1 overflow-y-auto pb-24">
         {/* 预算信息条：设置预算后常驻展示（预算 / 已支出 / 剩余可用） */}
-        {settings.budget && settings.budget > 0 && (() => {
+        {!!settings.budget && settings.budget > 0 && (() => {
           const exp = monthSummary.expense
           const remaining = settings.budget - exp
           const ratio = exp / settings.budget
@@ -371,6 +372,8 @@ export function AccountingScreen() {
 
         {tab === 'flow' && (
           <div className="px-3 py-3">
+            {compact&&<button onClick={()=>setFiltersOpen(!filtersOpen)} className="text-xs text-primary mb-2 py-1">{filtersOpen?'收起筛选':'筛选与导出'}{fType!=='all'||fCat!=='all'||fAcc!=='all'||search?' · 已筛选':''}</button>}
+            <div hidden={compact&&!filtersOpen}>
             {/* 筛选栏 */}
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <div className="flex bg-white rounded-full p-0.5 shadow-card">
@@ -453,6 +456,7 @@ export function AccountingScreen() {
               </div>
             </div>
 
+            </div>
             {/* 转账小计：只看转账时给出划转总额与手续费 */}
             {fType === 'transfer' && flowTransferSummary.count > 0 && (
               <div className="mb-3 px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-between text-[11px]">

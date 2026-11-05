@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(VoiceInputPlugin.class);
         registerPlugin(QuickChatPlugin.class);
         registerPlugin(CoachRemindersPlugin.class);
+        registerPlugin(CoachDailyPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

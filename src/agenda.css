@@ -54,3 +54,23 @@
 .is-compact nav .nav-button { padding:8px 4px; min-height:48px; }
 .is-compact nav .nav-button > span:last-child { font-size:12px; }
 .is-compact nav .nav-voice > span:first-child { width:32px; height:32px; border-radius:50%; background:rgb(var(--primary-rgb)); color:white; display:flex; align-items:center; justify-content:center; }
+
+/* The cover screen reserves room for conversation and entries. */
+.agent-compact .agent-header{padding:6px 10px;gap:6px;flex-wrap:nowrap}
+.agent-compact .agent-header h1{font-size:16px;white-space:nowrap}
+.agent-compact .agent-header button{font-size:11px;white-space:nowrap}
+.agent-compact .agent-messages{padding:6px 10px 10px}
+.agent-compact .agent-messages>div>div{padding:10px;margin-left:0;margin-right:0;font-size:13px;line-height:1.6}
+.agent-compact .agent-composer{padding:8px 10px}
+.agent-compact .voice-hold{height:52px;font-size:15px;line-height:1.2;white-space:nowrap}
+.voice-hold{contain:layout;-webkit-user-select:none;-webkit-touch-callout:none}
+.account-compact>header{padding:8px 10px}
+.account-compact>header>div:first-child{margin-bottom:8px;gap:6px}
+.account-compact h1{font-size:17px;white-space:nowrap}
+.account-compact>header button{font-size:11px;padding-left:8px;padding-right:8px}
+.account-compact .account-summary{display:flex;flex-direction:column;gap:4px;padding:8px 10px}
+.account-compact .account-summary>div{display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:center;gap:8px;border:0;min-width:0}
+.account-compact .account-summary>div>div:first-child{font-size:16px;line-height:1.4;overflow-wrap:anywhere;min-width:0}
+.account-compact .account-summary>div>div:last-child{font-size:11px;flex-shrink:0}
+.account-compact>header>div:last-child{margin-top:8px}
+.account-compact>div.overflow-y-auto{padding-bottom:12px;min-height:0}

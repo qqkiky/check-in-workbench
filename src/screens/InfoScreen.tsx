@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { loadInfo, type InfoFile, type InfoResult } from '@/services/infoData'
 import { Icons } from '@/components/common/Icons'
 
 type Item = {
@@ -217,40 +218,31 @@ class ModuleErrorBoundary extends React.Component<
   }
 }
 
-function useJson<T>(file: string) {
-  const [data, setData] = useState<T | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  useEffect(() => {
-    let alive = true
-    setLoading(true)
-    setError(false)
-    fetch(file + '?t=' + Date.now(), { cache: 'no-store' })
-      .then((r) => {
-        if (!r.ok) throw new Error('http ' + r.status)
-        return r.json()
-      })
-      .then((j) => {
-        if (!alive) return
-        setData(j)
-        setLoading(false)
-      })
-      .catch(() => {
-        if (!alive) return
-        setError(true)
-        setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [file])
-  return { data, loading, error }
+function useJson<T>(file:InfoFile) {
+ const [result,setResult]=useState<InfoResult<T>|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(false)
+ const [revision,refresh]=useState(0)
+ useEffect(()=>{
+  let alive=true
+  const run=(force=false)=>{setLoading(true);void loadInfo<T>(file,force).then(value=>{if(alive){setResult(value);setError(false)}}).catch(()=>{if(alive)setError(true)}).finally(()=>{if(alive)setLoading(false)})}
+  const resume=()=>{if(document.visibilityState==='visible')run()}
+  run(revision>0)
+  const timer=setInterval(resume,5*60000)
+  const reconnect=()=>{if(document.visibilityState==='visible')run(true)}
+  window.addEventListener('online',reconnect);document.addEventListener('visibilitychange',resume)
+  return ()=>{alive=false;clearInterval(timer);window.removeEventListener('online',reconnect);document.removeEventListener('visibilitychange',resume)}
+ },[file,revision])
+ return {data:result?.data??null,source:result?.source,loading,error,refresh:()=>refresh(n=>n+1)}
+}
+function UpdateStatus({data,source,loading,refresh}:{data:{generatedAt?:string}|null;source?:string;loading:boolean;refresh:()=>void}){
+ return <div className="flex gap-2 items-center text-[10px] text-gray-500 px-1 pt-1">
+ <span className="flex-1 min-w-0">{data?'内容更新 '+fmtDateTime(data.generatedAt)+(source==='cache'?' · 离线缓存':source==='bundled'?' · 安装包内容，尚未连上更新':''):'联网获取最新资讯'}</span>
+ <button disabled={loading} onClick={refresh} className="shrink-0 text-primary py-2">{loading?'更新中…':'刷新'}</button></div>
 }
 
 /** 内容模块（行业动态 / 药品信息 / 监管动态）：仅展示当月内容，外文内联译文与要点 */
 function SectionModule({ sectionKey }: { sectionKey: SectionKey }) {
   const meta = SECTION_META.find((s) => s.key === sectionKey)!
-  const { data, loading, error } = useJson<BriefData>('consult-data.json')
+  const { data, source, loading, error, refresh } = useJson<BriefData>('consult-data.json')
   const cur = currentMonthKey()
   const all = data?.sections?.[sectionKey] || []
   const items = all.filter((it) => itemMonth(it) === cur)
@@ -259,6 +251,7 @@ function SectionModule({ sectionKey }: { sectionKey: SectionKey }) {
 
   return (
     <div className="flex-1 overflow-y-auto pb-24 px-3 space-y-3">
+      <UpdateStatus data={data} source={source} loading={loading} refresh={refresh}/>
       <div className="flex items-center gap-2 px-1 pt-1">
         <SectionHeader sec={meta} count={monthCount} />
         <span className="ml-auto text-[10px] text-gray-400">
@@ -271,7 +264,7 @@ function SectionModule({ sectionKey }: { sectionKey: SectionKey }) {
         <EmptyState
           icon={<Icons.CloudOff size={40} />}
           title="暂未获取到资讯内容"
-          sub="每日 08:00 自动更新，请联网后重试"
+          sub="线上每日采集，打开或返回资讯时自动检查；请联网重试"
         />
       )}
       {!loading && !error && monthCount === 0 && (
@@ -294,7 +287,7 @@ function SectionModule({ sectionKey }: { sectionKey: SectionKey }) {
 
 /** 每月资讯：按月压缩归档，可展开查看当月概览与要点 */
 function MonthlyModule() {
-  const { data, loading, error } = useJson<MonthlyData>('monthly-summary.json')
+  const { data, source, loading, error, refresh } = useJson<MonthlyData>('monthly-summary.json')
   const [open, setOpen] = useState<string | null>(null)
 
   const months = data
@@ -303,6 +296,7 @@ function MonthlyModule() {
 
   return (
     <div className="flex-1 overflow-y-auto pb-24 px-3 space-y-3">
+      <UpdateStatus data={data} source={source} loading={loading} refresh={refresh}/>
       <p className="text-[11px] text-gray-400 px-1 pt-1">
         {loading ? '加载中…' : error ? '月报加载失败，请检查网络后重试' : `共 ${months.length} 个月归档 · 每次更新累积、按月压缩`}
       </p>

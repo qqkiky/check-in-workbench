@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { showToast } from '@/components/common/Toast'
 import { chatWithAgent, clearAgentHistory, readAgentConfig, readAgentHistory, saveAgentConfig, saveAgentHistory, testAgent, type AgentConfig, type AgentHistory } from '@/services/agent'
+import { currentDailyReport, refreshDaily } from '@/services/coachDaily'
 import { readCoachFocus } from '@/services/coach'
 import { CoachSettings } from '@/components/CoachSettings'
 import { executeWorkbench, type PendingAgentAction } from '@/services/agentActions'
+import { HoldGesture } from '@/services/holdGesture'
 import { HoldToTalk, NativeSpeech, type VoicePhase } from '@/services/voice'
 
 const PRESETS=[
@@ -14,19 +16,23 @@ const PRESETS=[
   {name:'OpenAI',url:'https://api.openai.com/v1',model:''},
   {name:'自定义',url:'',model:''},
 ]
-export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
+export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest?:number;compact?:boolean}) {
   const [config,setConfig]=useState<AgentConfig>(()=>readAgentConfig()||{url:PRESETS[0].url,key:'',model:PRESETS[0].model})
   const [history,setHistory]=useState<AgentHistory>(readAgentHistory)
+  const [report,setReport]=useState(currentDailyReport)
+  useEffect(()=>{const update=()=>setReport(currentDailyReport());window.addEventListener('coach-daily-updated',update);void refreshDaily();return()=>window.removeEventListener('coach-daily-updated',update)},[])
   const [open,setOpen]=useState(()=>!readAgentConfig())
   const [busy,setBusy]=useState(false),[testing,setTesting]=useState(false)
   const [input,setInput]=useState(''),[showKey,setShowKey]=useState(false),[error,setError]=useState('')
   const [settingsError,setSettingsError]=useState('')
   const [voiceMode,setVoiceMode]=useState(false),[voicePhase,setVoicePhase]=useState<VoicePhase>('idle'),[cancelVoice,setCancelVoice]=useState(false)
   const voiceSend=useRef<(text:string)=>void>(()=>{})
-  const pointer=useRef<{id:number;y:number;cancel:boolean}|null>(null)
+  const gesture=useRef<HoldGesture|null>(null)
   const voice=useRef<HoldToTalk|null>(null)
   if(!voice.current)voice.current=new HoldToTalk(NativeSpeech,{phase:setVoicePhase,text:text=>voiceSend.current(text),error:setError})
   const voiceActive=voicePhase!=='idle'
+  const beginVoice=useRef(()=>{});beginVoice.current=startVoice
+  if(!gesture.current)gesture.current=new HoldGesture({start:()=>beginVoice.current(),release:()=>voice.current?.release(),cancel:()=>voice.current?.cancel(),changed:setCancelVoice})
   useEffect(()=>{if(quickChatRequest)setVoiceMode(true)},[quickChatRequest])
   const bottom=useRef<HTMLDivElement>(null)
   useEffect(()=>{bottom.current?.scrollIntoView({block:'end'})},[history,busy])
@@ -36,12 +42,18 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
     return ()=>window.removeEventListener('agent-history-saved',refresh)
   },[busy])
   useEffect(()=>{
-    const cancel=()=>{pointer.current=null;setCancelVoice(false);voice.current?.cancel()}
+    const cancel=()=>{gesture.current?.cancel();setCancelVoice(false);voice.current?.cancel()}
     const hidden=()=>{if(document.visibilityState!=='visible')cancel()}
     // Keyboard/permission windows can briefly blur the WebView. Native onPause
     // and visibilitychange still cancel when the app actually leaves the foreground.
     document.addEventListener('visibilitychange',hidden)
-    return ()=>{document.removeEventListener('visibilitychange',hidden);voice.current?.cancel()}
+    const up=(e:PointerEvent)=>{if(e.pointerType!=='touch')gesture.current?.end(e.pointerId)}
+    const cancelled=(e:PointerEvent)=>{if(e.pointerType!=='touch')gesture.current?.end(e.pointerId,true)}
+    const move=(e:TouchEvent)=>{for(const t of Array.from(e.changedTouches))gesture.current?.move(t.identifier,t.clientY)}
+    const end=(e:TouchEvent)=>{for(const t of Array.from(e.changedTouches))gesture.current?.end(t.identifier,e.type==='touchcancel')}
+    window.addEventListener('pointerup',up);window.addEventListener('pointercancel',cancelled)
+    window.addEventListener('touchmove',move);window.addEventListener('touchend',end);window.addEventListener('touchcancel',end)
+    return ()=>{document.removeEventListener('visibilitychange',hidden);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',cancelled);window.removeEventListener('touchmove',move);window.removeEventListener('touchend',end);window.removeEventListener('touchcancel',end);cancel()}
   },[])
   async function send(message=input,fromVoice=false) {
     if(!message.trim()||busy)return
@@ -72,17 +84,18 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
     const next={...history,messages:history.messages.map(message=>message.role==='tool'&&message.tool_call_id===callId?{...message,content:JSON.stringify({status:'用户取消删除'})}:message),entries:history.entries.map(entry=>entry.id===entryId?{...entry,results:entry.results?.map((old,i)=>i===index?{text:'已取消删除，本机内容保留',modelStatus:'用户取消删除',callId}:old)}:entry)}
     await saveAgentHistory(next);setHistory(next)
   }
-  return <div className="flex flex-col h-full">
-    <header className="px-4 pt-3 pb-3 flex flex-wrap gap-2 items-center justify-between shrink-0">
-      <h1 className="text-xl font-medium text-gray-900">自律助手</h1>
+  return <div className={"agent-screen flex flex-col min-h-0 h-full "+(compact?"agent-compact":"")}>
+    <header className="agent-header px-4 pt-3 pb-3 flex flex-wrap gap-2 items-center justify-between shrink-0">
+      <h1 className="text-xl font-medium text-gray-900">{compact?'助手':'自律助手'}</h1>
       <div className="flex items-center gap-2 text-xs">
         <CoachSettings disabled={busy||voiceActive}/>
-        <button disabled={busy||testing||voiceActive} onClick={async()=>{await clearAgentHistory();setHistory({messages:[],entries:[]});setError('')}} className="text-gray-500 disabled:opacity-40">清空对话</button>
+        <button disabled={busy||testing||voiceActive} onClick={async()=>{await clearAgentHistory();setHistory({messages:[],entries:[]});setError('')}} className="agent-clear text-gray-500 disabled:opacity-40">{compact?'清空':'清空对话'}</button>
         <button disabled={busy||voiceActive} onClick={()=>{setConfig(readAgentConfig()||config);setOpen(true)}} className="text-primary disabled:opacity-40">API 设置</button>
       </div>
     </header>
     {readCoachFocus()&&<p className="px-4 pb-2 text-xs text-primary break-words">正在聊：{readCoachFocus()!.title} · {readCoachFocus()!.date}</p>}
-    <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
+    {report?.question&&<p className="px-3 pb-2 text-xs text-primary break-words" title={report.question}>{report.question}</p>}
+    <div className="agent-messages flex-1 min-h-0 overflow-y-auto px-4 pb-3 space-y-3">
       {!history.entries.length&&<div className="bg-white rounded-2xl p-4 text-sm text-gray-600 space-y-3">
         <p>告诉我你的目标，或者直接交代今天要做的事。我会和你确定计划，记住你的承诺，认真跟进。</p>
         <p>例如：“这个月想读完一本书，帮我拟个计划”“请记住，我想减少睡前刷手机”“把刚才那件事挪到明天”。日程、记账、账户和笔记也能继续处理。</p>
@@ -104,25 +117,23 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
       {error&&<p className="text-sm text-red-600 bg-red-50 p-3 rounded-xl" role="alert">{error}</p>}
       <div ref={bottom}/>
     </div>
-    <form onSubmit={e=>{e.preventDefault();if(!voiceActive)void send()}} className="shrink-0 px-3 py-3 bg-white border-t border-gray-100">
+    <form onSubmit={e=>{e.preventDefault();if(!voiceActive)void send()}} className="agent-composer shrink-0 px-3 py-3 bg-white border-t border-gray-100">
       <div className="flex items-end gap-2">
         <button type="button" aria-label={voiceMode?'切换到文字输入':'切换到语音输入'} disabled={busy||voiceActive} onClick={()=>setVoiceMode(!voiceMode)} className="w-11 h-12 shrink-0 rounded-xl bg-gray-100 text-sm text-gray-600 disabled:opacity-40">{voiceMode?'文字':'语音'}</button>
         {voiceMode?<button type="button" disabled={busy||voicePhase==='finishing'} aria-label="按住说话" aria-pressed={voicePhase==='listening'}
-          className={`flex-1 min-w-0 min-h-16 px-3 py-4 rounded-2xl border text-base font-medium select-none disabled:opacity-40 ${cancelVoice?'bg-red-500 text-white border-red-500':voiceActive?'bg-primary text-white border-primary':'bg-gray-100 text-gray-700 border-gray-200'}`}
+          className={`voice-hold flex-1 min-w-0 h-16 px-2 py-2 rounded-2xl border text-base font-medium select-none disabled:opacity-40 ${cancelVoice?'bg-red-500 text-white border-red-500':voiceActive?'bg-primary text-white border-primary':'bg-gray-100 text-gray-700 border-gray-200'}`}
           style={{touchAction:'none'}} onContextMenu={e=>e.preventDefault()}
-          onPointerDown={e=>{if(!e.isPrimary||e.button!==0||busy||voiceActive)return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);pointer.current={id:e.pointerId,y:e.clientY,cancel:false};startVoice()}}
-          onPointerMove={e=>{if(pointer.current?.id!==e.pointerId)return;const distance=pointer.current.y-e.clientY;const cancel=distance>(pointer.current.cancel?72:112);pointer.current.cancel=cancel;setCancelVoice(cancel)}}
-          onPointerUp={e=>{if(pointer.current?.id!==e.pointerId)return;const cancel=pointer.current.cancel;pointer.current=null;setCancelVoice(false);if(cancel)voice.current?.cancel();else voice.current?.release()}}
-          onPointerCancel={()=>{pointer.current=null;setCancelVoice(false);voice.current?.cancel()}}
-          onLostPointerCapture={()=>{if(pointer.current){pointer.current=null;setCancelVoice(false);voice.current?.cancel()}}}
-          onKeyDown={e=>{if(e.key==='Escape'){voice.current?.cancel();return}if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();startVoice()}}}
+          onTouchStart={e=>{if(busy||voiceActive||e.touches.length!==1)return;const t=e.changedTouches[0];gesture.current?.begin(t.identifier,t.clientY)}}
+          onPointerDown={e=>{if(e.pointerType==='touch'||!e.isPrimary||e.button!==0||busy||voiceActive)return;e.preventDefault();gesture.current?.begin(e.pointerId,e.clientY)}}
+          onPointerMove={e=>{if(e.pointerType!=='touch')gesture.current?.move(e.pointerId,e.clientY)}}
+          onKeyDown={e=>{if(e.key==='Escape'){gesture.current?.cancel();voice.current?.cancel();return}if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();startVoice()}}}
           onKeyUp={e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();voice.current?.release()}}}
-        >{cancelVoice?'松开取消':voicePhase==='preparing'?'正在准备，请继续按住…':voicePhase==='listening'?'松开发送，上滑取消':voicePhase==='finishing'?'正在识别…':voicePhase==='ready'?'录音已结束，松开发送':'按住说话'}</button>:<>
+        >{cancelVoice?'松开取消':voicePhase==='preparing'?'准备中，继续按住':voicePhase==='listening'?'松开发送':voicePhase==='finishing'?'正在识别…':voicePhase==='ready'?'松开发送':'按住说话'}</button>:<>
           <TextArea aria-label="给 AI 助手发消息" value={input} disabled={busy||voiceActive} onChange={e=>setInput(e.target.value)} rows={2} maxLength={4000} placeholder="说说要安排或记录的事情…" className="flex-1 min-w-0 resize-none bg-gray-100 rounded-xl px-3 py-2 text-base outline-none"/>
           <button disabled={busy||voiceActive||!input.trim()} type="submit" className="px-4 py-3 bg-primary rounded-xl text-white text-sm disabled:opacity-40">发送</button>
         </>}
       </div>
-      {voiceMode&&<p className="mt-2 text-[10px] text-gray-400">单次最长60秒。系统语音识别可能联网；识别文字自动发给当前 AI，应用不保存录音。首次允许麦克风后，请重新按住说话。</p>}
+      {voiceMode&&!compact&&<p className="mt-2 text-[10px] text-gray-400">单次最长60秒。系统语音识别可能联网；识别文字自动发给当前 AI，应用不保存录音。首次允许麦克风后，请重新按住说话。</p>}
     </form>
     <Modal open={open} onClose={()=>{if(!testing)setOpen(false)}} title="AI 服务设置">
       <form noValidate className="space-y-4" onSubmit={async e=>{
@@ -141,7 +152,7 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
         <label className="block text-sm">API Key<TextInput name="key" value={config.key} disabled={testing} onChange={e=>setConfig({...config,key:e.target.value})} type={showKey?'text':'password'} autoComplete="off" autoCapitalize="none" autoCorrect="off" placeholder="只填在这里，不要发到对话里" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
         <button type="button" disabled={testing} onClick={()=>setShowKey(!showKey)} className="text-xs text-primary">{showKey?'隐藏密钥':'显示密钥'}</button>
         <label className="block text-sm">模型名／接入点 ID<TextInput name="model" value={config.model} disabled={testing} onChange={e=>setConfig({...config,model:e.target.value})} autoCapitalize="none" autoCorrect="off" placeholder="填写服务商控制台提供的模型名" className="w-full mt-1 p-3 rounded-xl border text-base"/></label>
-        <p className="text-xs text-gray-400">支持 OpenAI 兼容的 Chat Completions 和工具调用。切换服务地址或模型会清空旧对话，避免把旧对话自动发给另一家服务商。</p>
+        <p className="text-xs text-gray-400">支持 OpenAI 兼容的 Chat Completions 和工具调用。系统语音识别可能联网，应用不保存录音。切换服务地址或模型会清空旧对话，避免把旧对话自动发给另一家服务商。</p>
         {settingsError&&<p role="alert" className="text-sm text-red-600 bg-red-50 p-3 rounded-xl break-words">{settingsError}</p>}
         <button type="submit" disabled={testing} className="w-full rounded-xl bg-primary text-white p-3 disabled:opacity-40">{testing?'连接测试中…':'测试连接并保存'}</button>
       </form>

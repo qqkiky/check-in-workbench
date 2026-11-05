@@ -19,6 +19,7 @@ import { syncTasksToCalendar, watchCalendarChanges } from './capacitor/task-cale
 import { Icons } from './components/common/Icons'
 import { initAssistantSync } from './services/assistant'
 import { focusNotification } from './services/coach'
+import { initDailyCoach } from './services/coachDaily'
 import { initCoachReminders } from './services/coachReminders'
 import { AgentScreen } from './screens/AgentScreen'
 import { listenForQuickChat } from './services/quickChat'
@@ -63,6 +64,7 @@ export default function App() {
     init()
     initAssistantSync()
     initCoachReminders()
+    initDailyCoach()
   }, [init])
 
   // 主题色变化（用户在「更多→外观」切换）实时套用
@@ -153,8 +155,8 @@ export default function App() {
         ) : (
           <div key={animateKey} className="absolute inset-0 animate-fade-in">
             {tab === 'home' && <HomeScreen compact={compact} onOpenAgent={Capacitor.isNativePlatform() ? () => switchTab('agent') : undefined} />}
-            {tab === 'agent' && <AgentScreen quickChatRequest={quickChatRequest} />}
-            {tab === 'account' && <AccountingScreen />}
+            {tab === 'agent' && <AgentScreen compact={compact} quickChatRequest={quickChatRequest} />}
+            {tab === 'account' && <AccountingScreen compact={compact} />}
             {tab === 'timeline' && <TimelineReviewScreen />}
             {tab === 'info' && <InfoScreen />}
             {tab === 'more' && <MoreScreen onOpenNotes={openNotes} onOpenList={() => setListOpen(true)} onNavigate={compact ? switchTab : undefined} />}
