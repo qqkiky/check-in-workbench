@@ -230,3 +230,50 @@ test('local habit rescheduling detaches just one occurrence and preserves later 
  assert.equal(f.state.tasks.length,2);const habit=f.state.tasks.find(task=>task.id==='habit'),moved=f.state.tasks.find(task=>task.id!=='habit');
  assert.equal(habit.recurrence,'daily');assert.deepEqual(habit.excludedDates,[day]);assert.equal(moved.recurrence,'none');assert.equal(moved.scheduledDate,'2026-12-01');assert.equal(moved.scheduledTime,'20:00');
 });
+
+test('current snapshot overrides historical time edits without inventing duplicates and includes real recurring weekdays',async()=>{
+ const {fixture:f,service:a}=await load(),original=globalThis.fetch;
+ f.state.tasks=[{id:'stretch',title:'拉伸运动',recurrence:'weekly',weekdays:[2,4,6],scheduledTime:'20:00',categoryId:'life',description:'PRIVATE_NOTE',createdAt:Date.now()}];
+ f.state.notes=[{content:'PRIVATE_NOTEBOOK'}];f.state.transactions=[{note:'PRIVATE_LEDGER'}];
+ let requests=0;
+ globalThis.fetch=async(_url,options)=>{
+  requests++;const body=JSON.parse(options.body),last=body.messages.at(-1);
+  assert.equal(last.content,'我的拉伸运动要改晚一点，因为我还在上班。');
+  const context=body.messages.at(-2);assert.equal(context.role,'user');
+  const snapshot=JSON.parse(context.content.slice(context.content.indexOf('{')));
+  assert.equal(snapshot.kind,'workbench_current_tasks');assert.equal(snapshot.countsByTitle['拉伸运动'],1);
+  assert.equal(snapshot.tasks.length,1);assert.equal(snapshot.tasks[0].id,'stretch');assert.equal(snapshot.tasks[0].time,'20:00');assert.deepEqual(snapshot.tasks[0].weekdays,[2,4,6]);
+  assert.ok(!JSON.stringify(body).includes('PRIVATE'));
+  return Response.json({choices:[{message:{content:'还在上班的话，可以给下班后留一点缓冲。今晚预计几点下班？'}}]});
+ };
+ try{
+  const config={url:'https://api.example/v1',key:'KEY',model:'MODEL'};
+  const history={messages:[{role:'user',content:'每周二四六21点拉伸运动'},{role:'assistant',content:'已设21点。'},{role:'user',content:'改成20点'},{role:'assistant',content:'已改成20点。'}],entries:[]};
+  const result=await a.chatWithAgent(config,history,'我的拉伸运动要改晚一点，因为我还在上班。');
+  assert.equal(f.state.tasks.length,1);assert.equal(f.state.tasks[0].scheduledTime,'20:00');assert.equal(requests,1);
+  assert.equal(result.messages.filter(row=>row.content?.startsWith('【应用当前任务快照')).length,0);
+ }finally{globalThis.fetch=original}
+});
+
+test('recurring save feedback shows the actual weekly or monthly rule rather than a missing date',async()=>{
+ const {fixture:f,service:a}=await load();
+ f.state.tasks=[{id:'stretch',title:'拉伸运动',recurrence:'weekly',weekdays:[2,4,6],scheduledTime:'20:00',categoryId:'life',createdAt:Date.now()}];
+ const changed=await a.executeWorkbench({action:'update_task',query:'stretch',time:'20:30'});
+ assert.match(changed.text,/周二四六 20:30/);assert.ok(!changed.text.includes('日期未定'));assert.deepEqual(f.state.tasks[0].weekdays,[2,4,6]);
+ await a.executeWorkbench({action:'update_task',query:'stretch',recurrence:'monthly',monthDay:15});
+ const monthly=await a.executeWorkbench({action:'update_task',query:'stretch',time:'21:00'});
+ assert.match(monthly.text,/每月15号 21:00/);assert.ok(!monthly.text.includes('日期未定'));
+});
+
+test('a model cannot silently invent a clock time from later while I am still at work',async()=>{
+ const {fixture:f,service:a}=await load(),original=globalThis.fetch;
+ f.state.tasks=[{id:'stretch',title:'拉伸运动',recurrence:'weekly',weekdays:[2,4,6],scheduledTime:'20:00',categoryId:'life',createdAt:Date.now()}];
+ globalThis.fetch=async()=>Response.json({choices:[{message:{tool_calls:[{id:'invented-clock',type:'function',function:{name:'workbench',arguments:JSON.stringify({action:'update_task',query:'stretch',time:'21:30'})}}]}}]});
+ try{
+  const history=await a.chatWithAgent({url:'https://api.example/v1',key:'KEY',model:'MODEL'},{messages:[],entries:[]},'我的拉伸运动要改晚一点，因为我还在上班。');
+  assert.equal(f.state.tasks[0].scheduledTime,'20:00');assert.equal(f.calendar,0);assert.match(history.entries.at(-1).results[0].text,/预计几点下班/);
+  assert.match(history.entries.at(-1).results[0].text,/本次没有改动/);
+  await a.chatWithAgent({url:'https://api.example/v1',key:'KEY',model:'MODEL'},{messages:[],entries:[]},'拉伸改晚一点，21点半吧');
+  assert.equal(f.state.tasks[0].scheduledTime,'21:30');
+ }finally{globalThis.fetch=original}
+});

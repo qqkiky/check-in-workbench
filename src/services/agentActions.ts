@@ -86,7 +86,7 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
     patch.weekdays=args.weekdays??current?.weekdays;patch.monthDay=args.monthDay??current?.monthDay
     if(recurrence==='weekly'&&(!patch.weekdays?.length||patch.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
     if(recurrence==='monthly'&&(!Number.isInteger(patch.monthDay)||patch.monthDay!<1||patch.monthDay!>31))throw new Error('请明确每月几号')
-    label=`${patch.scheduledDate||'日期未定'} ${patch.scheduledTime||'时间未定'} ${patch.title}`;calendar=true
+    label=`${patch.title} · ${recurrence==='none'?(patch.scheduledDate||'日期未定'):recurrenceShortLabel(patch as Task)} ${patch.scheduledTime||'时间未定'}`;calendar=true
     if(current&&current.recurrence!=='none'&&args.date&&args.date!==(args.targetDate||today)) {
       const day=args.targetDate||today
       if(!taskOccursOnDate(current,new Date(day+'T00:00:00')))throw new Error('原日期没有这项习惯，请明确要移动哪一天')

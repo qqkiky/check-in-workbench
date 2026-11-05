@@ -92,7 +92,7 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
         <div className={`max-w-full min-w-0 rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap break-words ${entry.role==='user'?'bg-primary text-white ml-8':'bg-white text-gray-800 mr-2'}`}>
           {entry.text&&<p>{entry.text}</p>}
           {entry.results?.map((result,i)=><div key={i} className={i?'border-t border-gray-100 mt-3 pt-3':''}>
-            <p>{result.text}</p>
+            {entry.text&&result.modelStatus.startsWith("操作已在本机保存")&&!result.pending?<details className="mt-2 text-xs text-gray-500"><summary className="cursor-pointer text-primary">已保存 · 查看详情</summary><p className="mt-2">{result.text}</p></details>:<p>{result.text}</p>}
             {result.pending&&<div className="flex gap-3 mt-3">
               <button disabled={busy||voiceActive} onClick={()=>void cancelDelete(entry.id,i)} className="px-3 py-2 rounded-xl bg-gray-100 disabled:opacity-40">取消</button>
               <button disabled={busy||voiceActive} onClick={()=>void confirmDelete(entry.id,i,result.pending!)} className="px-3 py-2 rounded-xl bg-red-500 text-white disabled:opacity-40">确认删除</button>
