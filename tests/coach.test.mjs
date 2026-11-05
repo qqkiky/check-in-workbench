@@ -83,3 +83,11 @@ test('model memory proposals remain local drafts, tool status is truthful, and r
  await api.dismissProposal(api.readProposals()[0].id);
  assert.match(api.readAgentHistory().messages.find(row=>row.tool_call_id==='proposal-call').content,/未采纳/);
 });
+
+test('a future-start habit in an adopted plan has no reminders before its confirmed start date',async()=>{
+ const {ctx,api}=await fixture();const start=new Date();start.setDate(start.getDate()+3);
+ const day=start.getFullYear()+'-'+String(start.getMonth()+1).padStart(2,'0')+'-'+String(start.getDate()).padStart(2,'0');
+ await api.proposeCoach({action:'suggest_plan',items:[{title:'未来开始阅读',date:day,time:'20:00',recurrence:'daily'}]});
+ await api.acceptProposal(api.readProposals()[0].id);ctx.values.set('wb.coach.reminders.v1',JSON.stringify({enabled:true}));
+ const events=api.reminderEvents(new Date(date()+'T08:00:00'));assert.ok(events.length>0);assert.ok(events.every(event=>event.date>=day));
+});

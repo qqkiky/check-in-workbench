@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { readCoachReminders } from '@/services/coachReminders'
 import { useStore } from '@/store'
 import { showActionToast } from '@/components/common/Toast'
 import { APP_NAME } from '@/types'
@@ -62,6 +63,7 @@ function nextReminderTime(task: Task, now: Date, catchupMs: number = CATCHUP_MS)
 
 /** 触发一条提醒；已完成的任务不提醒。返回是否真正弹出。 */
 function fireReminder(task: Task, records: CheckInRecord[]): boolean {
+  if(Capacitor.getPlatform()==='android'&&readCoachReminders().enabled)return false
   const todayStr = fmtDate(new Date())
   const done = records.some((r) => r.taskId === task.id && r.date === todayStr)
   if (done) return false
@@ -121,7 +123,7 @@ export function useReminderScheduler() {
   const firstRun = useRef(true)
 
   useEffect(() => {
-    if (!enabled || Capacitor.getPlatform()==='android') return
+    if (!enabled || (Capacitor.getPlatform()==='android'&&readCoachReminders().enabled)) return
     const now = new Date()
     // 首屏打开时放宽补发窗口到 2 小时，避免「打开 App 时刚错过提醒」看不到
     const catchup = firstRun.current ? 2 * 60 * 60 * 1000 : CATCHUP_MS

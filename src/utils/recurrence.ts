@@ -12,6 +12,7 @@ const WEEKDAY_SHORT = ['日', '一', '二', '三', '四', '五', '六']
  */
 export function taskOccursOnDate(task: Task, date: Date): boolean {
   if (task.archivedAt || task.isQuick || task.excludedDates?.includes(fmtDate(date))) return false
+  if(task.recurrence!=='none'&&task.scheduledDate&&fmtDate(date)<task.scheduledDate)return false
   const dow = date.getDay()
   switch (task.recurrence) {
     case 'daily':
