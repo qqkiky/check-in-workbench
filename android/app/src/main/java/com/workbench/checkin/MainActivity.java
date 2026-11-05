@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AgentHttpPlugin.class);
         registerPlugin(VoiceInputPlugin.class);
         registerPlugin(QuickChatPlugin.class);
+        registerPlugin(CoachRemindersPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

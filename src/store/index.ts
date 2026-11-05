@@ -430,6 +430,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   reset() {
     const removedTaskIds=get().tasks.map(task=>task.id)
+    storage.resetCoachData()
     // 真正清空：任务与记录置空，分类恢复默认，保持已初始化标记避免重新播种示例数据
     storage.setTasks([])
     storage.setRecords([])

@@ -18,6 +18,8 @@ import { pullOnly } from './services/cloudSync'
 import { syncTasksToCalendar, watchCalendarChanges } from './capacitor/task-calendar'
 import { Icons } from './components/common/Icons'
 import { initAssistantSync } from './services/assistant'
+import { focusNotification } from './services/coach'
+import { initCoachReminders } from './services/coachReminders'
 import { AgentScreen } from './screens/AgentScreen'
 import { listenForQuickChat } from './services/quickChat'
 import { useCompactLayout } from './utils/useCompactLayout'
@@ -49,7 +51,8 @@ export default function App() {
   useReminderScheduler()
   const openNotes = () => setTab('notes')
 
-  useEffect(() => listenForQuickChat(() => {
+  useEffect(() => listenForQuickChat(context => {
+    if(context?.taskId&&context.date)focusNotification(context.taskId,context.date)
     setDetailTaskId(null)
     setListOpen(false)
     setTab('agent')
@@ -59,6 +62,7 @@ export default function App() {
   useEffect(() => {
     init()
     initAssistantSync()
+    initCoachReminders()
   }, [init])
 
   // 主题色变化（用户在「更多→外观」切换）实时套用

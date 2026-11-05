@@ -6,6 +6,7 @@
 // - 触感：支持的移动端会轻振动一下
 
 import { useEffect, useRef } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { useStore } from '@/store'
 import { showActionToast } from '@/components/common/Toast'
 import { APP_NAME } from '@/types'
@@ -120,7 +121,7 @@ export function useReminderScheduler() {
   const firstRun = useRef(true)
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || Capacitor.getPlatform()==='android') return
     const now = new Date()
     // 首屏打开时放宽补发窗口到 2 小时，避免「打开 App 时刚错过提醒」看不到
     const catchup = firstRun.current ? 2 * 60 * 60 * 1000 : CATCHUP_MS

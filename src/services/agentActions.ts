@@ -1,6 +1,7 @@
 import { useStore } from '@/store'
 import { flushPrivateStorage } from './appStorage'
 import { fmtDate, dt } from '@/utils/date'
+import { buildTodayAgenda } from './todayAgenda'
 import { taskOccursOnDate, recurrenceShortLabel } from '@/utils/recurrence'
 import { accountBalance, formatMoney } from '@/utils/accounting'
 import { syncTasksToCalendar, isCalendarSyncEnabled } from '@/capacitor/task-calendar'
@@ -9,15 +10,15 @@ import type { Task, Transaction, Account } from '@/types'
 export const AGENT_ACTIONS = ['list_tasks','add_task','update_task','complete_task','update_completion_time','reopen_task','delete_task','list_transactions','add_transaction','update_transaction','delete_transaction','list_accounts','add_account','update_account','delete_account','list_notes','add_note','update_note','delete_note','add_transfer'] as const
 export interface AgentArgs {
   action: typeof AGENT_ACTIONS[number]
-  query?: string; title?: string; content?: string; date?: string; time?: string
+  pendingOnly?:boolean; query?: string; title?: string; content?: string; date?: string; time?: string
   completedDate?: string; completedTime?: string
   targetDate?: string; startDate?: string; endDate?: string; duration?: number; recurrence?: string; weekdays?: number[]; monthDay?: number
   type?: string; amountCents?: number; account?: string; category?: string; note?: string
   name?: string; accountType?: string; initialBalanceCents?: number; fromAccount?: string; toAccount?: string; feeCents?: number
 }
 export interface PendingAgentAction { args: AgentArgs; guard: string; label: string }
-export interface AgentResult { text: string; modelStatus: string; pending?: PendingAgentAction; callId?: string }
-const fields = ['action','query','title','content','date','time','completedDate','completedTime','targetDate','startDate','endDate','duration','recurrence','weekdays','monthDay','type','amountCents','account','category','note','name','accountType','initialBalanceCents','fromAccount','toAccount','feeCents']
+export interface AgentResult { proposalId?:string; text: string; modelStatus: string; pending?: PendingAgentAction; callId?: string }
+const fields = ['pendingOnly','action','query','title','content','date','time','completedDate','completedTime','targetDate','startDate','endDate','duration','recurrence','weekdays','monthDay','type','amountCents','account','category','note','name','accountType','initialBalanceCents','fromAccount','toAccount','feeCents']
 function text(value: unknown, label: string, max=200): string {
   if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error(`请明确${label}`)
   return value.trim()
@@ -46,7 +47,7 @@ function inRange(day:string,args:AgentArgs) { return (!args.startDate||day>=args
 export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAction): Promise<AgentResult> {
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||Object.keys(raw).some(key=>!fields.includes(key))||!AGENT_ACTIONS.includes(raw.action))throw new Error('助手返回了不支持的操作，未执行')
   const args=Object.fromEntries(Object.entries(raw).filter(([,value])=>value!==null&&value!==undefined)) as unknown as AgentArgs
-  for(const [key,value] of Object.entries(args))if(!['duration','monthDay','amountCents','initialBalanceCents','feeCents','weekdays'].includes(key)&&typeof value!=='string')throw new Error('助手返回的字段格式不正确，未执行')
+  for(const [key,value] of Object.entries(args))if(key==='pendingOnly'?typeof value!=='boolean':!['duration','monthDay','amountCents','initialBalanceCents','feeCents','weekdays'].includes(key)&&typeof value!=='string')throw new Error('助手返回的字段格式不正确，未执行')
   if(args.weekdays!==undefined&&(!Array.isArray(args.weekdays)||args.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
   if(args.note!==undefined&&args.note.length>1000)throw new Error('备注太长，请缩短后重试')
   const s=useStore.getState(), today=fmtDate(new Date())
@@ -66,8 +67,9 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
     const start=args.date||args.startDate,end=args.date||args.endDate
     if((start&&!end)||(!start&&end))throw new Error('请提供查询的起止日期')
     if(start&&end&&dt.differenceInDays(new Date(end+'T00:00:00'),new Date(start+'T00:00:00'))>366)throw new Error('请把待办查询范围缩短到一年内')
-    const rows=start&&end?dt.eachDayOfInterval({start:new Date(start+'T00:00:00'),end:new Date(end+'T00:00:00')}).flatMap(day=>selected.filter(item=>taskOccursOnDate(item,day)).map(item=>({item,day:fmtDate(day)}))):selected.map(item=>({item,day:item.scheduledDate||today}))
-    return {text:rows.length?rows.slice(0,50).map(({item,day})=>`${s.records.some(record=>record.taskId===item.id&&record.date===day)?'✅':'□'} ${start?day:recurrenceShortLabel(item)||item.scheduledDate||'未指定日期'} ${item.scheduledTime||''} ${item.title}［${item.id}］`).join('\n')+(rows.length>50?`\n共${rows.length}项，仅展示前50项`:''):'没有符合条件的待办',modelStatus:'查询已在本机完成，结果仅向用户显示'}
+    const allRows=start&&end?dt.eachDayOfInterval({start:new Date(start+'T00:00:00'),end:new Date(end+'T00:00:00')}).flatMap(day=>selected.filter(item=>taskOccursOnDate(item,day)).map(item=>({item,day:fmtDate(day)}))):selected.map(item=>({item,day:item.scheduledDate||today}))
+    const rows=args.pendingOnly&&start===today&&end===today?buildTodayAgenda(s.tasks,s.records,new Date()).pending.map(row=>({item:row.task,day:row.dateKey})):args.pendingOnly?allRows.filter(({item,day})=>!s.records.some(record=>record.taskId===item.id&&(item.recurrence==='none'||record.date===day))):allRows
+    return {text:rows.length?rows.slice(0,50).map(({item,day})=>`${s.records.some(record=>record.taskId===item.id&&(item.recurrence==='none'||record.date===day))?'✅':'□'} ${start?day:recurrenceShortLabel(item)||item.scheduledDate||'未指定日期'} ${item.scheduledTime||''} ${item.title}［${item.id}］`).join('\n')+(rows.length>50?`\n共${rows.length}项，仅展示前50项`:''):'没有符合条件的待办',modelStatus:'查询已在本机完成，结果仅向用户显示'}
   }
   if(args.action==='add_task'||args.action==='update_task') {
     const current=args.action==='update_task'?selectTask():null

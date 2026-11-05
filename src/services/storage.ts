@@ -163,6 +163,9 @@ export const storage = {
   // ---------- 全量备份 / 恢复 ----------
   // 导出所有以 wb. 为前缀的 appStorage 数据（含记账/笔记/时间线/转账等全部模块），
   // 返回带元信息的 JSON 字符串。采用前缀扫描而非硬编码键，避免未来新增模块被遗漏。
+  resetCoachData() {
+    for(const key of ['wb.coach.memories.v1','wb.coach.reminders.v1','wb.assistant.coach.proposals.v1','wb.assistant.coach.focus.v1','wb.assistant.coach.changes.v1'])appStorage.removeItem(key)
+  },
   exportAllData(): string {
     const data: Record<string, string> = {}
     for (let i = 0; i < appStorage.length; i++) {

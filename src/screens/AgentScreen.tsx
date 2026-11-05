@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { showToast } from '@/components/common/Toast'
 import { chatWithAgent, clearAgentHistory, readAgentConfig, readAgentHistory, saveAgentConfig, saveAgentHistory, testAgent, type AgentConfig, type AgentHistory } from '@/services/agent'
+import { readCoachFocus } from '@/services/coach'
+import { CoachSettings } from '@/components/CoachSettings'
 import { executeWorkbench, type PendingAgentAction } from '@/services/agentActions'
 import { HoldToTalk, NativeSpeech, type VoicePhase } from '@/services/voice'
 
@@ -71,17 +73,19 @@ export function AgentScreen({quickChatRequest=0}:{quickChatRequest?:number}) {
     await saveAgentHistory(next);setHistory(next)
   }
   return <div className="flex flex-col h-full">
-    <header className="px-4 pt-3 pb-3 flex items-center justify-between shrink-0">
-      <h1 className="text-2xl font-light text-gray-900">AI 助手</h1>
-      <div className="flex items-center gap-3 text-sm">
+    <header className="px-4 pt-3 pb-3 flex flex-wrap gap-2 items-center justify-between shrink-0">
+      <h1 className="text-xl font-medium text-gray-900">自律助手</h1>
+      <div className="flex items-center gap-2 text-xs">
+        <CoachSettings disabled={busy||voiceActive}/>
         <button disabled={busy||testing||voiceActive} onClick={async()=>{await clearAgentHistory();setHistory({messages:[],entries:[]});setError('')}} className="text-gray-500 disabled:opacity-40">清空对话</button>
         <button disabled={busy||voiceActive} onClick={()=>{setConfig(readAgentConfig()||config);setOpen(true)}} className="text-primary disabled:opacity-40">API 设置</button>
       </div>
     </header>
+    {readCoachFocus()&&<p className="px-4 pb-2 text-xs text-primary break-words">正在聊：{readCoachFocus()!.title} · {readCoachFocus()!.date}</p>}
     <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
       {!history.entries.length&&<div className="bg-white rounded-2xl p-4 text-sm text-gray-600 space-y-3">
-        <p>直接说你想做什么，日程、记账、账户和笔记都可以在这里处理。</p>
-        <p>例如：“明天下午五点整理测试资料”“微信支出午饭30元”“查询本月支出”“记一条笔记”。</p>
+        <p>告诉我你的目标，或者直接交代今天要做的事。我会和你确定计划，记住你的承诺，认真跟进。</p>
+        <p>例如：“这个月想读完一本书，帮我拟个计划”“请记住，我想减少睡前刷手机”“把刚才那件事挪到明天”。日程、记账、账户和笔记也能继续处理。</p>
         <p className="text-xs text-gray-400">你发送的对话及匹配所需的待办标题、日期和状态交给所选 API 服务处理，不包含任务备注。查账、余额和笔记检索结果只在本机显示，不发给模型。删除需要点击确认。点击输入区的“语音”可按住说话、松开发送。</p>
       </div>}
       {history.entries.map(entry=><div key={entry.id} className={`flex ${entry.role==='user'?'justify-end':'justify-start'}`}>

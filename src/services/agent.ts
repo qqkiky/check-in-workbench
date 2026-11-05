@@ -3,6 +3,7 @@ import { appStorage, flushPrivateStorage, saveStorageBatch } from './appStorage'
 import { AGENT_ACTIONS, executeWorkbench, type AgentArgs, type AgentResult } from './agentActions'
 import { fmtDate } from '@/utils/date'
 import { useStore } from '@/store'
+import { COACH_TOOL, coachContext, proposeCoach, rememberOperation, localCorrection } from './coach'
 
 const CONFIG='wb.assistant.agent.connection.v1', HISTORY='wb.assistant.agent.history.v1'
 const AgentHttp=registerPlugin<{request(options:{url:string;key:string;body:unknown}):Promise<any>}>('AgentHttp')
@@ -42,7 +43,7 @@ export async function saveAgentHistory(history:AgentHistory) {
 export async function clearAgentHistory(){appStorage.removeItem(HISTORY);await flushPrivateStorage()}
 const strings=['query','title','content','date','time','completedDate','completedTime','targetDate','startDate','endDate','recurrence','type','account','category','note','name','accountType','fromAccount','toAccount']
 const COMPLETION_RULES='\n完成与完成时间：complete_task用于标记完成，可带completedTime(HH:mm)和completedDate(YYYY-MM-DD)表示实际完成时间。update_completion_time专门更正已有完成记录，必须带query和completedTime；date/targetDate定位任务实例所属日，completedDate是实际完成日，没说实际日期时保留原完成日。时间更正不得使用update_task改变计划时间，不得使用reopen_task。reopen_task仅用于用户明确说取消打卡、撤销完成、还没完成、恢复待办。例：“下午3点完成了整理资料”调用complete_task或update_completion_time，completedTime=15:00；“完成时间不是3点，是4点”调用update_completion_time，completedTime=16:00，原记录继续已完成。无法确定修改哪天哪条时只追问一个关键问题。'
-export const WORKBENCH_TOOL={type:'function',function:{name:'workbench',description:'操作期待中的本地日程、账目、账户、笔记和转账。返回的查询数据仅在手机显示，不会发给模型。',parameters:{type:'object',properties:{action:{type:'string',enum:AGENT_ACTIONS},...Object.fromEntries(strings.map(key=>[key,{type:'string'}])),...Object.fromEntries(['duration','monthDay','amountCents','initialBalanceCents','feeCents'].map(key=>[key,{type:'integer'}])),weekdays:{type:'array',items:{type:'integer'}}},required:['action'],additionalProperties:false}}}
+export const WORKBENCH_TOOL={type:'function',function:{name:'workbench',description:'操作期待中的本地日程、账目、账户、笔记和转账。返回的查询数据仅在手机显示，不会发给模型。',parameters:{type:'object',properties:{pendingOnly:{type:'boolean'},action:{type:'string',enum:AGENT_ACTIONS},...Object.fromEntries(strings.map(key=>[key,{type:'string'}])),...Object.fromEntries(['duration','monthDay','amountCents','initialBalanceCents','feeCents'].map(key=>[key,{type:'integer'}])),weekdays:{type:'array',items:{type:'integer'}}},required:['action'],additionalProperties:false}}}
 function systemPrompt() {
   const now=new Date()
   const state=useStore.getState()
@@ -53,7 +54,7 @@ function systemPrompt() {
 export async function requestAgent(config:AgentConfig,messages:AgentMessage[],tools=true) {
   const url=agentEndpoint(config.url)
   const fast=['api.deepseek.com','ark.cn-beijing.volces.com'].includes(new URL(url).hostname)
-  const body={model:config.model,messages:[{role:'system',content:systemPrompt()+COMPLETION_RULES},...messages],stream:false,...(fast?{thinking:{type:'disabled'}}:{}),...(tools?{tools:[WORKBENCH_TOOL],tool_choice:'auto'}:{})}
+  const body={model:config.model,messages:[{role:'system',content:systemPrompt()+COMPLETION_RULES+coachContext(messages.filter(row=>row.role==='user').slice(-1)[0]?.content||'')},...messages],stream:false,...(fast?{thinking:{type:'disabled'}}:{}),...(tools?{tools:[WORKBENCH_TOOL,COACH_TOOL],tool_choice:'auto'}:{})}
   if(Capacitor.getPlatform()==='android')return AgentHttp.request({url,key:config.key,body})
   const response=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${config.key}`,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(90000)})
   if(!response.ok)throw new Error(`AI 服务请求失败（${response.status}），请检查地址、密钥和模型名`)
@@ -72,24 +73,30 @@ export async function chatWithAgent(config:AgentConfig,history:AgentHistory,inpu
   const entries=[...history.entries,{id:crypto.randomUUID(),role:'user' as const,text:input.trim()}]
   const sameConnection=()=>{const current=readAgentConfig();return !current||current.url===config.url&&current.key===config.key&&current.model===config.model}
   try {
-    const response=await requestAgent(config,messages)
+    const correction=localCorrection(input)
+    const response=correction?{choices:[{message:{role:'assistant',tool_calls:[{id:crypto.randomUUID(),type:'function',function:{name:'workbench',arguments:JSON.stringify(correction)}}]}}]}:await requestAgent(config,messages)
     const message=response?.choices?.[0]?.message
     if(response?.choices?.[0]?.finish_reason==='length')throw new Error('模型回复被截断，未执行操作；请拆分需求后重试')
     if(!message||typeof message!=='object')throw new Error('接口返回格式不兼容，未执行操作')
     const calls=message.tool_calls||[]
-    if(!Array.isArray(calls)||calls.length>5||calls.some((call:any)=>call.type!=='function'||call.function?.name!=='workbench'||typeof call.id!=='string')||new Set(calls.map((call:any)=>call.id)).size!==calls.length)throw new Error('模型返回的工具调用不正确，未执行操作')
-    const parsed:AgentArgs[]=calls.map((call:any)=>JSON.parse(call.function.arguments))
+    if(!Array.isArray(calls)||calls.length>5||calls.some((call:any)=>call.type!=='function'||!['workbench','coach'].includes(call.function?.name)||typeof call.id!=='string')||new Set(calls.map((call:any)=>call.id)).size!==calls.length)throw new Error('模型返回的工具调用不正确，未执行操作')
+    const parsed:any[]=calls.map((call:any)=>JSON.parse(call.function.arguments))
     messages.push({role:'assistant',content:typeof message.content==='string'?message.content:null,...(typeof message.reasoning_content==='string'?{reasoning_content:message.reasoning_content}:{}),...(calls.length?{tool_calls:calls}:{})})
     const results:AgentResult[]=[]
     for(let i=0;i<parsed.length;i++) {
       let result:AgentResult
       try{
         if(!sameConnection())throw new Error('服务配置已改变，未执行本次操作，请重新发送')
+        if(calls[i].function.name==='coach') {
+          const proposal=await proposeCoach(parsed[i]);results.push({...proposal,callId:calls[i].id});messages.push({role:'tool',tool_call_id:calls[i].id,content:JSON.stringify({status:proposal.modelStatus})});continue
+        }
         const undo=/(取消.{0,12}(完成|打卡)|撤销|恢复.{0,12}(待办|未完成)|未完成|没(?:有)?(?:做完|完成)|还没|重做|重新做)/.test(input)
         if(parsed[i].action==='reopen_task'&&!undo)throw new Error('没有收到明确取消完成的意思；如果是修改完成时间，本次保留原完成记录')
         const completing=/(完成(?:的)?时间|[\d一二两三四五六七八九十][点:：].{0,12}(完成|做完|搞定)|(?:完成|做完|搞定)(?:于|在).{0,8}[\d一二两三四五六七八九十][点:：])/.test(input)
         if(!undo&&completing&&(parsed[i].action==='reopen_task'||parsed[i].action==='update_task'&&(parsed[i].time!==undefined||parsed[i].date!==undefined)))throw new Error('你是在报告完成或更正完成时间，本次保留完成状态和原计划；请明确事项及实际完成时间')
+        const before=useStore.getState().tasks.map(task=>({...task}))
         result=await executeWorkbench(parsed[i])
+        if(result.modelStatus.startsWith('操作已在本机保存')){rememberOperation(before,parsed[i]);await flushPrivateStorage()}
       }catch(error){result={text:error instanceof Error?error.message:'操作失败',modelStatus:'未执行成功。'+(error instanceof Error?error.message:'请补充信息')}}
       result.callId=calls[i].id;results.push(result)
       messages.push({role:'tool',tool_call_id:calls[i].id,content:JSON.stringify({status:result.modelStatus})})
@@ -97,7 +104,7 @@ export async function chatWithAgent(config:AgentConfig,history:AgentHistory,inpu
     const content=typeof message.content==='string'?message.content.trim():''
     const reply=calls.length?'':/(已添加|已记录|已创建|已删除|已记账|已更新|已保存|已安排|已完成|已同步)/.test(content)?'这次没有收到可执行操作，本机数据没有改变。请补充具体事项。':content||'请补充你想做的事情。'
     entries.push({id:crypto.randomUUID(),role:'assistant',text:reply,results} as ChatEntry)
-    if(calls.length && results.some(result=>result.modelStatus.startsWith('操作已在本机保存'))) {
+    if(!correction && calls.length && results.some(result=>result.modelStatus.startsWith('操作已在本机保存'))) {
       try {
         const summary=await requestAgent(config,[...messages,{role:'user',content:'请根据工具的真实执行状态，用一两句自然中文回应刚才的请求。只总结已成功的操作，失败或待确认的要如实说明；账本转账不能称为真实划款。不要再次调用工具或索要已提供的信息。'}],false)
         const answer=summary?.choices?.[0]
