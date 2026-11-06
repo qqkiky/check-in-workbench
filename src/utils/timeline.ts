@@ -55,13 +55,14 @@ export function buildDayTimeline(
   const items: DayTimelineItem[] = [
     ...dayRecords.map<DayTimelineItem>((r) => {
       const cat = catOf(r.categoryId)
-      const startT = r.startedAt
-        ? dt.format(new Date(r.startedAt), 'HH:mm')
-        : dt.format(new Date(r.completedAt), 'HH:mm')
+      const seconds = Math.max(0, Number(r.durationSeconds) || 0)
+      const startT = dt.format(new Date(r.startedAt ?? (r.completedAt - seconds * 1000)), 'HH:mm')
+      const endT = dt.format(new Date(r.completedAt), 'HH:mm')
       return {
         type: 'checkin',
         id: r.id,
         time: startT,
+        endTime: endT,
         color: cat?.color || '#34C759',
         catName: cat?.name,
         title: r.taskTitle,
@@ -79,7 +80,7 @@ export function buildDayTimeline(
         color: cat?.color || '#8E8E93',
         catName: cat?.name,
         content: e.content,
-        dur: 0,
+        dur: timelineDurationSeconds(e.startTime, e.endTime),
       }
     }),
   ].sort((a, b) => a.time.localeCompare(b.time))

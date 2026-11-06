@@ -1,4 +1,5 @@
 import React from 'react'
+import './categoryIcons.css'
 
 export type IconName =
   | 'sun' | 'cloudSun' | 'briefcase' | 'moon' | 'home' | 'book' | 'bed'
@@ -23,6 +24,7 @@ export type IconName =
   | 'basketball' | 'tennis' | 'swim' | 'yoga' | 'meditate' | 'sleep'
   | 'sunrise' | 'sunset' | 'rain' | 'wind' | 'mountain' | 'beach'
   | 'tent' | 'bus' | 'train' | 'ship' | 'bike' | 'walk'
+  | 'flask' | 'car' | 'graduation' | 'wallet'
 
 type IconProps = { size?: number; color?: string; className?: string }
 type IconFC = (p: IconProps) => JSX.Element
@@ -888,7 +890,13 @@ const Walk: IconFC = ({ size = 16, color, className }) => (
   </svg>
 )
 
+const Flask: IconFC = ({size=16,color}) => <svg {...base(size,color)}><path d="M9 3h6m-5 0v6l-6 9a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-6-9V3"/><path d="M8 14h8l3 5H5z"/><circle cx="12" cy="17" r=".7"/></svg>
+const Car: IconFC = ({size=16,color}) => <svg {...base(size,color)}><path d="m5 10 2-5h10l2 5"/><rect x="4" y="10" width="16" height="8" rx="2"/><path d="M6 18v2m12-2v2M7 14h1m8 0h1"/></svg>
+const Graduation: IconFC = ({size=16,color}) => <svg {...base(size,color)}><path d="m2 10 10-5 10 5-10 5z"/><path d="M6 12v6l6 2 6-2v-6m4-2v6"/></svg>
+const Wallet: IconFC = ({size=16,color}) => <svg {...base(size,color)}><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M21 11h-6a2.5 2.5 0 0 0 0 5h6m-5-2.5h.1"/></svg>
+
 export const ICONS: Record<IconName, IconFC> = {
+  flask: Flask, car: Car, graduation: Graduation, wallet: Wallet,
   sun: Sun, cloudSun: CloudSun, briefcase: Briefcase, moon: Moon, home: Home,
   book: Book, bed: Bed, trendingUp: TrendingUp, dumbbell: Dumbbell, heart: Heart,
   star: Star, leaf: Leaf, coffee: Coffee, music: Music, droplet: Droplet,
@@ -925,16 +933,20 @@ export function CategoryIcon({
   category,
   size = 16,
   color,
+  filled=false,
+  fillColor,
 }: {
   category: { icon?: string; emoji?: string }
   size?: number
   color?: string
+  filled?: boolean
+  fillColor?: string
 }) {
   const key = category.icon as IconName | undefined
   if (key && ICONS[key]) {
     const C = ICONS[key]
     return (
-      <span className={color ? '' : ''} style={{ color: color || 'currentColor', display: 'inline-flex' }}>
+      <span className={filled?'category-icon-filled':undefined} style={{color:color||'currentColor',display:'inline-flex','--category-icon-fill':fillColor||`color-mix(in srgb, ${color||'#80A3BE'} 33%, #fff)`} as React.CSSProperties}>
         <C size={size} color={color || 'currentColor'} />
       </span>
     )

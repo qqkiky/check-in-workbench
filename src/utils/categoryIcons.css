@@ -1,0 +1,5 @@
+
+/* Fill only the enclosed parts. The outer icon wrapper stays transparent. */
+.category-icon-filled svg :is(rect,circle,ellipse,polygon,path[d$="z"],path[d$="Z"]):not([fill]) {
+  fill: var(--category-icon-fill);
+}

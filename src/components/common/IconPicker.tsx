@@ -1,48 +1,31 @@
-import { ICONS, ICON_NAMES, type IconName } from '@/utils/iconLibrary'
+import { CategoryIcon, ICON_NAMES, type IconName } from '@/utils/iconLibrary'
+import './categoryPicker.css'
 
-interface Props {
-  value?: string
-  onChange: (name: IconName) => void
-  /** 底色：让图标预览带上分类色，底色 = 图3 月视图中显示的色块 */
-  color?: string
-}
-
-// 图标库选择器：用户从图标库中自由选择分类图标
-// 可选地传入分类底色，让每个图标的底色都跟随分类，便于预览
-export function IconPicker({ value, onChange, color }: Props) {
-  // 把 #RRGGBB 转成 #RRGGBB22 这种带透明度的色（用于非选中态的预览）
-  const tint = color ? `${color}22` : '#F2F2F7'
-  return (
-    <div className="grid grid-cols-6 gap-1.5 max-h-44 overflow-y-auto pr-1">
-      {ICON_NAMES.map((name) => {
-        const C = ICONS[name]
-        const active = value === name
-        return (
-          <button
-            key={name}
-            type="button"
-            onClick={() => onChange(name)}
-            className={`aspect-square rounded-lg flex items-center justify-center transition active:scale-90 ${
-              active ? 'shadow-sm' : ''
-            }`}
-            style={{
-              background: active ? color || '#007AFF' : tint,
-              color: active ? '#fff' : color || '#6B7280',
-            }}
-            aria-label={name}
-          >
-            <C size={18} color={active ? '#fff' : color || 'currentColor'} />
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-export const CATEGORY_COLORS = [
-  '#FF3B30', '#FF9500', '#FFCC00', '#34C759', '#30B0C7',
-  '#5AC8FA', '#007AFF', '#5856D6', '#AF52DE', '#FF2D55',
-  '#A2845E', '#8E8E93',
-  // 多了几抹柔和糖果色
-  '#FFB6C1', '#FFD8A8', '#B5EAD7', '#C7CEEA', '#FFDAC1', '#E0BBE4',
+const featured: {id:IconName;label:string}[]=[
+  {id:'briefcase',label:'工作'},{id:'flask',label:'实验'},{id:'book',label:'阅读'},{id:'dumbbell',label:'运动'},
+  {id:'home',label:'生活'},{id:'heart',label:'健康'},{id:'car',label:'出行'},{id:'graduation',label:'学习'},
+  {id:'target',label:'专注'},{id:'moon',label:'休息'},{id:'wallet',label:'财务'},{id:'lightbulb',label:'灵感'},
 ]
+const other=ICON_NAMES.filter(id=>!featured.some(item=>item.id===id))
+
+const iconFills:Partial<Record<IconName,string>>={briefcase:'#EAB19F',flask:'#A7CADA',book:'#B6C6E5',dumbbell:'#C7B9E4',home:'#B3CDB2',heart:'#E9B1A9',car:'#AFC7DB',graduation:'#E4CB9E',target:'#E5A391',moon:'#CEC3E3',wallet:'#C5D2AC',lightbulb:'#EAD494'}
+
+export function IconPicker({value,onChange}:{value?:string;onChange:(name:IconName)=>void}){
+  const option=(id:IconName,label?:string)=><button className="category-icon-choice" type="button" key={id} aria-label={label||id} aria-pressed={value===id} onClick={()=>onChange(id)}>
+    <CategoryIcon category={{icon:id}} color={value===id?'#36596a':'#454e45'} size={22} filled fillColor={iconFills[id]}/>
+    {label&&<span>{label}</span>}
+  </button>
+  return <>
+    <div className="category-icon-featured">{featured.map(({id,label})=>option(id,label))}</div>
+    <details className="category-icon-more" open={value&&other.includes(value as IconName)?true:undefined}>
+      <summary>更多图标</summary><div>{other.map(id=>option(id))}</div>
+    </details>
+  </>
+}
+
+export const CATEGORY_PALETTE=[
+  {color:'#D98179',name:'暖珊瑚'},{color:'#70A98B',name:'鼠尾草'},
+  {color:'#80A3BE',name:'雾蓝'},{color:'#A498DA',name:'淡紫'},
+  {color:'#BA996E',name:'麦芽'},{color:'#9DA89D',name:'岩灰'},
+]
+export const CATEGORY_COLORS=CATEGORY_PALETTE.map(p=>p.color)

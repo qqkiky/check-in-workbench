@@ -2,7 +2,7 @@ import { TextInput } from '@/components/common/TextField'
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
-import { IconPicker, CATEGORY_COLORS } from '@/components/common/IconPicker'
+import { IconPicker, CATEGORY_COLORS, CATEGORY_PALETTE } from '@/components/common/IconPicker'
 import { useStore } from '@/store'
 import { showToast } from '@/components/common/Toast'
 import { CategoryIcon, type IconName } from '@/utils/iconLibrary'
@@ -21,17 +21,17 @@ export function CategoryFormModal({ open, categoryId, onClose, onSaved }: Props)
 
   const [name, setName] = useState('')
   const [color, setColor] = useState(CATEGORY_COLORS[0])
-  const [icon, setIcon] = useState<IconName>('star')
+  const [icon, setIcon] = useState<IconName|undefined>('star')
 
   useEffect(() => {
     if (!open) return
     if (editing) {
       setName(editing.name)
       setColor(editing.color)
-      setIcon((editing.icon as IconName) || 'star')
+      setIcon(editing.icon as IconName|undefined)
     } else {
       setName('')
-      setColor(CATEGORY_COLORS[Math.floor(Math.random() * CATEGORY_COLORS.length)])
+      setColor(CATEGORY_COLORS[0])
       setIcon('star')
     }
   }, [open, categoryId])
@@ -78,7 +78,7 @@ export function CategoryFormModal({ open, categoryId, onClose, onSaved }: Props)
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="category-editor space-y-4">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">分类名称</label>
           <TextInput
@@ -91,41 +91,23 @@ export function CategoryFormModal({ open, categoryId, onClose, onSaved }: Props)
         </div>
 
         <div>
-          <label className="text-xs text-gray-500 mb-2 block">
-            选择底色
-            <span className="text-gray-400 ml-1.5">（决定图3月视图中显示的色块）</span>
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORY_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`w-8 h-8 rounded-full transition active:scale-90 ${
-                  color === c ? 'ring-2 ring-offset-2 ring-gray-700' : ''
-                }`}
-                style={{ background: c }}
-                aria-label={c}
-              />
-            ))}
+          <label className="category-editor-label">分类颜色</label>
+          <div className="category-palette">
+            {CATEGORY_PALETTE.map(p=><button key={p.color} type="button" onClick={()=>setColor(p.color)} aria-pressed={p.color===color}>
+              <i style={{background:p.color}}/>{p.name}
+            </button>)}
           </div>
         </div>
 
         <div>
           <label className="text-xs text-gray-500 mb-2 block">选择图标</label>
-          <IconPicker value={icon} onChange={setIcon} color={color} />
+          <IconPicker value={icon} onChange={setIcon} />
         </div>
 
-        {/* 预览：综合展示最终效果 */}
-        <div className="flex items-center gap-3 pt-1">
-          <span className="text-xs text-gray-500">预览：</span>
-          <span
-            className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: `${color}22`, color }}
-          >
-            <CategoryIcon category={{ icon, emoji: '' }} size={20} color={color} />
-          </span>
-          <span className="text-sm text-gray-700">{name || '分类名'}</span>
+        <div className="category-preview">
+          <span className="text-xs text-gray-500">预览</span>
+          <CategoryIcon category={{icon,emoji:editing?.emoji}} size={22} color={color} filled/>
+          <strong className="text-sm">{name || '分类名'}</strong>
         </div>
       </div>
     </Modal>
