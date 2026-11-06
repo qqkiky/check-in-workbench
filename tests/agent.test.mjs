@@ -3,16 +3,22 @@ import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 
 async function load(){
- const state={tasks:[],records:[],transactions:[],notes:[],transfers:[],accounts:[{id:'wx',name:'微信',type:'wechat',initialBalance:100,color:'#123'},{id:'cash',name:'现金',type:'cash',initialBalance:0,color:'#123'}],acctCategories:[{id:'out',name:'其他支出',type:'expense'},{id:'in',name:'其他收入',type:'income'}]};
+ const state={tasks:[],records:[],categories:[{id:'work',name:'工作'},{id:'life',name:'生活'},{id:'study',name:'阅读'}],transactions:[],notes:[],transfers:[],accounts:[{id:'wx',name:'微信',type:'wechat',initialBalance:100,color:'#123'},{id:'cash',name:'现金',type:'cash',initialBalance:0,color:'#123'}],acctCategories:[{id:'out',name:'其他支出',type:'expense'},{id:'in',name:'其他收入',type:'income'}]};
  let id=0;
  for(const [suffix,table] of [['Task','tasks'],['Record','records'],['Transaction','transactions'],['Account','accounts'],['Transfer','transfers']]){
   state['add'+suffix]=value=>{const key='local-'+(++id);state[table].unshift({...value,id:key,createdAt:Date.now(),updatedAt:Date.now()});return key};
   state['update'+suffix]=(key,patch)=>{state[table]=state[table].map(item=>item.id===key?{...item,...patch}:item)};
   state['delete'+suffix]=key=>{state[table]=state[table].filter(item=>item.id!==key)};
  }
- state.addNote=content=>state.notes.unshift({id:'note-'+(++id),content,updatedAt:Date.now()});
+ state.addNote=content=>{const key='note-'+(++id);state.notes.unshift({id:key,content,updatedAt:Date.now()});return key};
  state.updateNote=(key,content)=>{state.notes=state.notes.map(item=>item.id===key?{...item,content}:item)};
  state.deleteNote=key=>{state.notes=state.notes.filter(item=>item.id!==key)};
+ state.saveAgentTaskBatch=async(tasks,records,noteIds)=>{
+  if(globalThis.agentTest.diskError)throw Error('disk_error');
+  state.tasks.unshift(...tasks.filter(task=>!state.tasks.some(row=>row.id===task.id)));
+  state.records.unshift(...records.filter(record=>!state.records.some(row=>row.id===record.id)));
+  state.notes=state.notes.filter(note=>!noteIds.includes(note.id));
+ };
  const fixture={state,values:new Map(),calendar:0,enabled:true,platform:'web'};globalThis.agentTest=fixture;
  const modules={
   '@/store':`export const useStore={getState:()=>globalThis.agentTest.state};`,
@@ -24,10 +30,15 @@ async function load(){
  return {fixture,service:await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'))};
 }
 
+async function saveTask(service,args){
+ const {draft}=await service.executeWorkbench(args);
+ return (await service.saveAgentTasks([{draft,categoryId:'work'}]))[0];
+}
+
 test('local agent validates schedules, preserves identity on edits and syncs occurrence completion',async()=>{
  const {fixture:f,service:a}=await load();
- await assert.rejects(a.executeWorkbench({action:'add_task'}),/补充/);assert.equal(f.state.tasks.length,0);
- await a.executeWorkbench({action:'add_task',title:'整理资料',date:'2026-11-02',time:'17:00'});const id=f.state.tasks[0].id;
+ await assert.rejects(saveTask(a,{action:'add_task'}),/补充/);assert.equal(f.state.tasks.length,0);
+ await saveTask(a,{action:'add_task',title:'整理资料',date:'2026-11-02',time:'17:00'});const id=f.state.tasks[0].id;
  await a.executeWorkbench({action:'update_task',query:id,date:'2026-12-01',time:'18:00',title:'整理测试资料'});
  assert.equal(f.state.tasks.length,1);assert.equal(f.state.tasks[0].scheduledDate,'2026-12-01');assert.equal(f.state.tasks[0].id,id);
  await a.executeWorkbench({action:'complete_task',query:id});assert.equal(f.state.records[0].date,'2026-12-01');
@@ -43,17 +54,17 @@ test('local agent validates schedules, preserves identity on edits and syncs occ
 
 test('undated and untimed todos save directly, and later scheduling preserves their identity',async()=>{
  const {fixture:f,service:a}=await load();
- const result=await a.executeWorkbench({action:'add_task',title:'有空整理书柜'});
+ const result=await saveTask(a,{action:'add_task',title:'有空整理书柜'});
  const quick=f.state.tasks[0];assert.equal(quick.isQuick,true);assert.equal(quick.scheduledTime,undefined);assert.equal(quick.scheduledDate,undefined);assert.equal(quick.reminderEnabled,false);assert.match(result.text,/时间未定/);
- await a.executeWorkbench({action:'add_task',title:'周一整理资料',date:'2026-11-02'});
+ await saveTask(a,{action:'add_task',title:'周一整理资料',date:'2026-11-02'});
  const dated=f.state.tasks[0];assert.equal(dated.scheduledDate,'2026-11-02');assert.equal(dated.scheduledTime,undefined);assert.equal(dated.isQuick,false);
  await a.executeWorkbench({action:'update_task',query:quick.id,date:'2026-11-03',time:'15:00'});
  const planned=f.state.tasks.find(t=>t.id===quick.id);assert.equal(planned.isQuick,false);assert.equal(planned.scheduledTime,'15:00');assert.equal(f.state.tasks.length,2);
  await a.executeWorkbench({action:'update_task',query:quick.id,time:''});
  const cleared=f.state.tasks.find(t=>t.id===quick.id);assert.equal(cleared.scheduledTime,undefined);assert.equal(cleared.scheduledDate,'2026-11-03');assert.equal(cleared.reminderEnabled,false);
- await a.executeWorkbench({action:'add_task',title:'每天伸展，时间待定',recurrence:'daily'});assert.equal(f.state.tasks[0].isQuick,false);assert.equal(f.state.tasks[0].scheduledTime,undefined);
- await assert.rejects(a.executeWorkbench({action:'add_task',title:'买菜',time:'15:00'}),/日期/);
- await assert.rejects(a.executeWorkbench({action:'add_task',title:'买菜',time:'三点'}),/几点/);
+ await saveTask(a,{action:'add_task',title:'每天伸展，时间待定',recurrence:'daily'});assert.equal(f.state.tasks[0].isQuick,false);assert.equal(f.state.tasks[0].scheduledTime,undefined);
+ await assert.rejects(saveTask(a,{action:'add_task',title:'买菜',time:'15:00'}),/日期/);
+ await assert.rejects(saveTask(a,{action:'add_task',title:'买菜',time:'三点'}),/几点/);
 });
 
 test('money and accounts are explicit; moving a bill preserves identity and transfers do not inflate expenses',async()=>{
@@ -74,7 +85,7 @@ test('money and accounts are explicit; moving a bill preserves identity and tran
 
 test('correcting completion time preserves the record, completion and planned schedule',async()=>{
  const {fixture:f,service:a}=await load();
- await a.executeWorkbench({action:'add_task',title:'完成时间测试',date:'2026-10-30',time:'17:00'});const task=f.state.tasks[0];
+ await saveTask(a,{action:'add_task',title:'完成时间测试',date:'2026-10-30',time:'17:00'});const task=f.state.tasks[0];
  const record={id:'original-record',taskId:task.id,taskTitle:task.title,categoryId:'work',date:'2026-10-31',completedAt:new Date('2026-10-31T18:00:00').getTime(),durationSeconds:600,note:'keep-note',progress:2};
  f.state.records=[record];
  const result=await a.executeWorkbench({action:'update_completion_time',query:task.id,completedTime:'15:00'});
@@ -187,20 +198,22 @@ test('connection validation explains each missing field before sending any API r
  }finally{globalThis.fetch=original}
 });
 
-test('released speech executes once and acknowledges without replaying the schedule',async()=>{
+test('released speech prepares one draft and waits for category confirmation',async()=>{
  const {fixture:f,service:a}=await load();const original=globalThis.fetch;let resolveSpeech,requests=0,complete;
  const done=new Promise(resolve=>{complete=resolve});const capture=new Promise(resolve=>{resolveSpeech=resolve});
  const config={url:'https://api.example/v1',key:'TEST_KEY',model:'test'};
  globalThis.fetch=async(_url,options)=>{
-  requests++;if(requests===2){assert.equal(JSON.parse(options.body).tools,undefined);return Response.json({choices:[{message:{content:'好，已安排好。'}}]});}assert.equal(JSON.parse(options.body).messages.at(-1).content,'明天下午五点整理资料');
+  requests++;assert.equal(JSON.parse(options.body).messages.at(-1).content,'明天下午五点整理资料');
   return Response.json({choices:[{message:{tool_calls:[{id:'voice-call',type:'function',function:{name:'workbench',arguments:JSON.stringify({action:'add_task',title:'整理资料',date:'2026-11-02',time:'17:00'})}}]}}]});
  };
  const voice=new a.HoldToTalk({status:async()=>({available:true,granted:true}),start:()=>capture,stop:async()=>{resolveSpeech({text:'明天下午五点整理资料'})},cancel:async()=>{},requestMicrophone:async()=>({granted:true})},{phase(){},error:message=>complete({error:message}),text:async text=>{try{complete(await a.chatWithAgent(config,{messages:[],entries:[]},text))}catch(error){complete({error})}}});
  try{
   await voice.press();assert.equal(requests,0);assert.equal(f.state.tasks.length,0);
-  voice.release();const result=await done;assert.ok(!result.error);assert.equal(requests,2);
+  voice.release();const result=await done;assert.ok(!result.error);assert.equal(requests,1);
+  assert.equal(f.state.tasks.length,0);
+  const [saved]=await a.saveAgentTasks([{draft:result.entries.at(-1).results[0].draft,categoryId:'study'}]);
   assert.equal(f.state.tasks.length,1);assert.equal(f.state.tasks[0].scheduledDate,'2026-11-02');assert.equal(f.state.tasks[0].scheduledTime,'17:00');assert.equal(f.calendar,1);
-  assert.match(result.entries.at(-1).results[0].text,/已同步系统日历/);
+  assert.equal(f.state.tasks[0].categoryId,'study');assert.match(saved.text,/已同步系统日历/);
  }finally{globalThis.fetch=original}
 });
 
@@ -276,4 +289,54 @@ test('a model cannot silently invent a clock time from later while I am still at
   await a.chatWithAgent({url:'https://api.example/v1',key:'KEY',model:'MODEL'},{messages:[],entries:[]},'拉伸改晚一点，21点半吧');
   assert.equal(f.state.tasks[0].scheduledTime,'21:30');
  }finally{globalThis.fetch=original}
+});
+
+
+test('completed spoken activity retries a note misclassification and waits for one batch of categories',async()=>{
+ const {fixture:f,service:a}=await load(),original=globalThis.fetch;
+ const config={url:'https://api.example/v1',key:'TEST_KEY',model:'test'};
+ let requests=0;
+ const tool=(id,args)=>({id,type:'function',function:{name:'workbench',arguments:JSON.stringify(args)}});
+ globalThis.fetch=async(_url,options)=>{
+  requests++;
+  assert.match(options.body,/生活/);
+  return Response.json({choices:[{message:{tool_calls:requests===1?[tool('bad-note',{action:'add_note',content:'敷面膜'})]:[
+   tool('mask',{action:'add_task',title:'敷面膜',date:'2026-11-06',time:'22:41',startedTime:'22:41',duration:15}),
+   tool('done',{action:'complete_task',query:'敷面膜',completedTime:'22:56'}),
+   tool('read',{action:'add_task',title:'看书',category:'阅读'}),
+  ]}}]});
+ };
+ try{
+  const history=await a.chatWithAgent(config,{messages:[],entries:[]},'昨天22:41～22:56我敷了面膜，另外加个看书的待办');
+  assert.equal(requests,2);assert.equal(f.state.notes.length,0);assert.equal(f.state.tasks.length,0);
+  const drafts=history.entries.at(-1).results.flatMap(result=>result.draft?[result.draft]:[]);
+  assert.equal(drafts.length,2);assert.equal(drafts[0].record.durationSeconds,900);
+  assert.equal(drafts[0].task.categoryId,'');assert.equal(drafts[1].task.categoryId,'study');
+  assert.ok(a.readAgentHistory().entries.at(-1).results.every(result=>!result.draft));
+  await assert.rejects(a.saveAgentTasks([{draft:drafts[0],categoryId:'life'},{draft:drafts[1],categoryId:'missing'}]),/选择/);
+  assert.equal(f.state.tasks.length,0);
+  await a.saveAgentTasks([{draft:drafts[0],categoryId:'life'},{draft:drafts[1],categoryId:'study'}]);
+  assert.deepEqual(f.state.tasks.map(task=>task.categoryId),['life','study']);assert.equal(f.state.records[0].categoryId,'life');
+ }finally{globalThis.fetch=original}
+});
+
+test('converting a note is guarded, confirms completion, and deleting a note never deletes adjacent notes',async()=>{
+ const {fixture:f,service:a}=await load();
+ const first=await a.executeWorkbench({action:'add_note',content:'晚上敷面膜15分钟'});
+ const original=f.state.notes[0],keep=f.state.addNote('别的笔记');
+ assert.match(first.modelStatus,new RegExp(original.id));
+ const args={action:'add_task',title:'敷面膜',sourceNote:original.id,date:'2026-11-06',time:'22:41',startedTime:'22:41',completedTime:'22:56',duration:15};
+ const {draft}=await a.executeWorkbench(args);
+ assert.equal(f.state.notes.length,2);assert.equal(f.state.tasks.length,0);
+ f.state.updateNote(original.id,'敷面膜已补充');
+ await assert.rejects(a.saveAgentTasks([{draft,categoryId:'life'}]),/原笔记已经变化/);
+ assert.equal(f.state.tasks.length,0);assert.equal(f.state.notes.length,2);
+ const fresh=(await a.executeWorkbench(args)).draft;
+ const rows=[{draft:fresh,categoryId:'life'}];
+ f.diskError=true;await assert.rejects(a.saveAgentTasks(rows),/disk_error/);
+ assert.equal(f.state.notes.length,2);assert.equal(f.state.tasks.length,0);
+ f.diskError=false;const [saved]=await a.saveAgentTasks(rows);
+ assert.match(saved.text,/已标记完成（15 分钟）；已删除指定原笔记/);
+ await a.saveAgentTasks(rows);
+ assert.deepEqual(f.state.notes.map(note=>note.id),[keep]);assert.equal(f.state.tasks.length,1);assert.equal(f.state.records.length,1);
 });

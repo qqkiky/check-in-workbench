@@ -101,6 +101,7 @@ export interface CheckInRecord {
 // 应用设置
 export interface AppSettings {
   theme: 'light' | 'dark'
+  assistantName?: string
   startOfWeek: 0 | 1        // 0=周日 1=周一
   showLunar: boolean
   notificationEnabled: boolean

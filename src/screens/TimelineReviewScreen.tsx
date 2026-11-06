@@ -28,7 +28,7 @@ export function TimelineReviewScreen(){
   const add=()=>setNote({startTime:day===fmtDate(new Date())?dt.format(new Date(),'HH:mm'):'09:00'})
   const edit=(id:string)=>{const entry=timelineEntries.find(row=>row.id===id);if(entry)setNote({entry,startTime:entry.startTime})}
   return <div className="rv-screen">
-    <header className="rv-header"><div className="rv-header-main"><h1>回顾</h1>
+    <header className="rv-header"><div className="agenda-brand rv-brand">期待</div><div className="rv-header-main"><h1>回顾</h1>
       {tab==='day'&&<div className="rv-nav">
         <label className="rv-date-input" title="选择日期"><Icons.Calendar size={18}/><input type="date" aria-label="选择回顾日期" value={day} onChange={e=>{if(e.target.value)setDay(e.target.value)}}/></label>
         <button type="button" aria-label="添加记事" onClick={add}><Icons.Plus size={17}/></button>

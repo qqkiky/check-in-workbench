@@ -2,7 +2,7 @@ import type { Task, CheckInRecord, Category, AppSettings, Note, TimelineEntry, T
 import { DEFAULT_CATEGORIES, DEFAULT_ACCT_CATEGORIES, DEFAULT_ACCT_ACCOUNTS } from '@/types'
 import { APP_VERSION } from '@/version'
 import { canExportKey } from './privacy'
-import { appStorage } from './appStorage'
+import { appStorage, saveStorageBatch } from './appStorage'
 
 const KEYS = {
   tasks: 'wb.tasks.v1',
@@ -37,6 +37,13 @@ function write<T>(key: string, value: T) {
 }
 
 export const storage = {
+  saveAgentTaskBatch(tasks: Task[], records: CheckInRecord[], notes: Note[]) {
+    return saveStorageBatch({
+      [KEYS.tasks]: JSON.stringify(tasks),
+      [KEYS.records]: JSON.stringify(records),
+      [KEYS.notes]: JSON.stringify(notes),
+    })
+  },
   getTasks(): Task[] {
     const raw = read<any[]>(KEYS.tasks, [])
     // 兼容旧数据：将 isRecurring/weekdays 归一化为 recurrence

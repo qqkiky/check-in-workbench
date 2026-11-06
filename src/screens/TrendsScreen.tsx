@@ -8,7 +8,7 @@ import { ReviewCategoryFilter, ReviewEmpty, ReviewNav, ReviewSwitch } from '@/co
 const tabs=[{key:'category' as const,label:'分类追踪'},{key:'heat' as const,label:'日历热力'}]
 const periods=[{key:'year' as const,label:'年'},{key:'month' as const,label:'月'}]
 const weekdays=['一','二','三','四','五','六','日']
-const shade=(n:number,max:number,color:string)=>n?`color-mix(in srgb, ${color} ${22+56*n/max}%, #f6f5f0)`:undefined
+const shade=(n:number,max:number,color:string)=>n?`color-mix(in srgb, ${color} ${22+56*n/max}%, #f4f6fb)`:undefined
 
 export function TrendsScreen(){
   const {records,categories,tasks,settings}=useStore()
@@ -20,7 +20,7 @@ export function TrendsScreen(){
   const today=fmtDate(new Date())
   const year=cursor.getFullYear(),month=cursor.getMonth()
   const category=categories.find(c=>c.id===filter)
-  const color=category?reviewColor(category):'#72977B'
+  const color=category?reviewColor(category):'rgb(var(--primary-rgb))'
   const months=useMemo(()=>Array.from({length:12},(_,i)=>monthDays(year,i)),[year])
   const filtered=useMemo(()=>records.filter(r=>r.date.startsWith(year+'-')&&(!filter||r.categoryId===filter)),[records,year,filter])
   const counts=useMemo(()=>calendarCounts(filtered),[filtered])

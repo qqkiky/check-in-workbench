@@ -26,6 +26,7 @@ interface StoreState {
   init: () => void
   reload: () => void
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void
+  saveAgentTaskBatch: (tasks: Task[], records: CheckInRecord[], noteIds: string[]) => Promise<void>
   updateTask: (id: string, patch: Partial<Task>) => void
   deleteTask: (id: string) => void
   applyCalendarDeletions: (keys:string[]) => { deletedTasks:number; cancelledOccurrences:number }
@@ -41,7 +42,7 @@ interface StoreState {
   updateCategory: (id: string, patch: Partial<Category>) => void
   deleteCategory: (id: string) => void
 
-  addNote: (content: string) => void
+  addNote: (content: string) => string | undefined
   updateNote: (id: string, content: string) => void
   deleteNote: (id: string) => void
 
@@ -172,6 +173,34 @@ export const useStore = create<StoreState>((set, get) => ({
     void syncTaskToCalendar(newTask, get().records)
   },
 
+  async saveAgentTaskBatch(tasks, records, noteIds) {
+    const state = get()
+    const taskIds = new Set(state.tasks.map(task => task.id))
+    const recordIds = new Set(state.records.map(record => record.id))
+    const addedTasks = tasks.filter(task => !taskIds.has(task.id))
+    const addedRecords = records.filter(record => !recordIds.has(record.id))
+    const next = {
+      tasks: [...addedTasks, ...state.tasks],
+      records: [...addedRecords, ...state.records],
+      notes: state.notes.filter(note => !noteIds.includes(note.id)),
+    }
+    const persisted = storage.saveAgentTaskBatch(next.tasks, next.records, next.notes)
+    set(next)
+    try {
+      await persisted
+    } catch (error) {
+      const current = get()
+      const restored = {
+        tasks: current.tasks.filter(task => !addedTasks.some(row => row.id === task.id)),
+        records: current.records.filter(record => !addedRecords.some(row => row.id === record.id)),
+        notes: [...current.notes, ...state.notes.filter(note => noteIds.includes(note.id) && !current.notes.some(row => row.id === note.id))],
+      }
+      set(restored)
+      await storage.saveAgentTaskBatch(restored.tasks, restored.records, restored.notes).catch(() => {})
+      throw error
+    }
+  },
+
   updateTask(id, patch) {
     const next = get().tasks.map((t) =>
       t.id === id ? { ...t, ...patch, updatedAt: Date.now() } : t
@@ -278,6 +307,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const next = [note, ...get().notes]
     storage.setNotes(next)
     set({ notes: next })
+    return note.id
   },
 
   deleteNote(id) {

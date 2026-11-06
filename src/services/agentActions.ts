@@ -5,20 +5,27 @@ import { buildTodayAgenda } from './todayAgenda'
 import { taskOccursOnDate, recurrenceShortLabel } from '@/utils/recurrence'
 import { accountBalance, formatMoney } from '@/utils/accounting'
 import { syncTasksToCalendar, isCalendarSyncEnabled } from '@/capacitor/task-calendar'
-import type { Task, Transaction, Account } from '@/types'
+import type { Task, Transaction, Account, CheckInRecord } from '@/types'
 
 export const AGENT_ACTIONS = ['list_tasks','add_task','update_task','complete_task','update_completion_time','reopen_task','delete_task','list_transactions','add_transaction','update_transaction','delete_transaction','list_accounts','add_account','update_account','delete_account','list_notes','add_note','update_note','delete_note','add_transfer'] as const
 export interface AgentArgs {
   action: typeof AGENT_ACTIONS[number]
   pendingOnly?:boolean; query?: string; title?: string; content?: string; date?: string; time?: string
-  completedDate?: string; completedTime?: string
+  completedDate?: string; completedTime?: string; startedTime?: string; sourceNote?: string; completed?: boolean
   targetDate?: string; startDate?: string; endDate?: string; duration?: number; recurrence?: string; weekdays?: number[]; monthDay?: number
   type?: string; amountCents?: number; account?: string; category?: string; note?: string
   name?: string; accountType?: string; initialBalanceCents?: number; fromAccount?: string; toAccount?: string; feeCents?: number
 }
 export interface PendingAgentAction { args: AgentArgs; guard: string; label: string }
-export interface AgentResult { proposalId?:string; text: string; modelStatus: string; pending?: PendingAgentAction; callId?: string }
-const fields = ['pendingOnly','action','query','title','content','date','time','completedDate','completedTime','targetDate','startDate','endDate','duration','recurrence','weekdays','monthDay','type','amountCents','account','category','note','name','accountType','initialBalanceCents','fromAccount','toAccount','feeCents']
+export interface AgentTaskDraft {
+  task: Task
+  label: string
+  record?: Omit<CheckInRecord,'categoryId'>
+  completionCallId?: string
+  note?: {id:string;guard:string;label:string;callId?:string}
+}
+export interface AgentResult { proposalId?:string; text: string; modelStatus: string; pending?: PendingAgentAction; draft?: AgentTaskDraft; callId?: string }
+const fields = ['pendingOnly','completed','startedTime','sourceNote','action','query','title','content','date','time','completedDate','completedTime','targetDate','startDate','endDate','duration','recurrence','weekdays','monthDay','type','amountCents','account','category','note','name','accountType','initialBalanceCents','fromAccount','toAccount','feeCents']
 function text(value: unknown, label: string, max=200): string {
   if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error(`请明确${label}`)
   return value.trim()
@@ -44,10 +51,55 @@ function one<T extends {id:string}>(items:T[], query:unknown, label:(item:T)=>st
 }
 function inRange(day:string,args:AgentArgs) { return (!args.startDate||day>=args.startDate)&&(!args.endDate||day<=args.endDate) }
 
+function taskFields(args:AgentArgs,current:Task|null) {
+  const recurrence=args.recurrence??current?.recurrence??'none'
+  if(!['none','daily','weekly','monthly'].includes(recurrence))throw new Error('重复方式不正确')
+  const patch:Partial<Task>={title:args.title!==undefined?text(args.title,'任务内容'):current?.title,scheduledDate:args.date!==undefined?date(args.date):current?.scheduledDate,scheduledTime:args.time!==undefined?(args.time===''?undefined:time(args.time)):current?.scheduledTime,recurrence:recurrence as Task['recurrence']}
+  if(!patch.title)throw new Error('请补充任务内容')
+  if(patch.scheduledTime&&!patch.scheduledDate&&recurrence==='none')throw new Error('请补充任务日期')
+  patch.isQuick=recurrence==='none'&&!patch.scheduledDate&&!patch.scheduledTime
+  patch.reminderEnabled=!!patch.scheduledTime&&(current?.reminderEnabled??true)
+  if(args.duration!==undefined&&(!Number.isInteger(args.duration)||args.duration<1||args.duration>1440))throw new Error('请明确有效时长')
+  patch.duration=args.duration??current?.duration??30
+  patch.weekdays=args.weekdays??current?.weekdays;patch.monthDay=args.monthDay??current?.monthDay
+  if(recurrence==='weekly'&&(!patch.weekdays?.length||patch.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
+  if(recurrence==='monthly'&&(!Number.isInteger(patch.monthDay)||patch.monthDay!<1||patch.monthDay!>31))throw new Error('请明确每月几号')
+  const label=`${patch.title} · ${recurrence==='none'?(patch.scheduledDate||'日期未定'):recurrenceShortLabel(patch as Task)} ${patch.scheduledTime||'时间未定'}`
+  return {patch,label}
+}
+
+export async function saveAgentTasks(rows:{draft:AgentTaskDraft;categoryId:string}[]):Promise<AgentResult[]> {
+  const state=useStore.getState(), noteIds=new Set<string>()
+  const tasks:Task[]=[], records:CheckInRecord[]=[]
+  for(const {draft,categoryId} of rows) {
+    const existing=state.tasks.find(task=>task.id===draft.task.id)
+    if(!state.categories.some(category=>category.id===categoryId))throw new Error('请为每条事项选择仍存在的分类')
+    if(draft.note&&!existing) {
+      const note=state.notes.find(item=>item.id===draft.note!.id)
+      if(!note||JSON.stringify(note)!==draft.note.guard)throw new Error('原笔记已经变化，请重新发起转换')
+      noteIds.add(note.id)
+    }
+    tasks.push({...draft.task,categoryId})
+    if(draft.record)records.push({...draft.record,categoryId})
+  }
+  await state.saveAgentTaskBatch(tasks,records,[...noteIds])
+  let calendarText=''
+  if(tasks.some(task=>task.scheduledTime)) {
+    if(!isCalendarSyncEnabled())calendarText='；尚未开启系统日历同步'
+    else try{const latest=useStore.getState();await syncTasksToCalendar(latest.tasks,latest.records);calendarText='；已同步系统日历'}catch{calendarText='；日历同步暂未成功'}
+  }
+  return rows.map(({draft,categoryId})=>{
+    const category=state.categories.find(item=>item.id===categoryId)!
+    const completion=draft.record?'；已标记完成'+(draft.record.startedAt!==undefined?`（${Math.round(draft.record.durationSeconds/60)} 分钟）`:''):''
+    const note=draft.note?'；已删除指定原笔记':''
+    return {text:`已保存：${draft.label} · ${category.name}${completion}${note}${draft.task.scheduledTime?calendarText:''}`,modelStatus:`操作已在本机保存：事项 ${draft.task.title}［${draft.task.id}］${completion}${note}`}
+  })
+}
+
 export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAction): Promise<AgentResult> {
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||Object.keys(raw).some(key=>!fields.includes(key))||!AGENT_ACTIONS.includes(raw.action))throw new Error('助手返回了不支持的操作，未执行')
   const args=Object.fromEntries(Object.entries(raw).filter(([,value])=>value!==null&&value!==undefined)) as unknown as AgentArgs
-  for(const [key,value] of Object.entries(args))if(key==='pendingOnly'?typeof value!=='boolean':!['duration','monthDay','amountCents','initialBalanceCents','feeCents','weekdays'].includes(key)&&typeof value!=='string')throw new Error('助手返回的字段格式不正确，未执行')
+  for(const [key,value] of Object.entries(args))if(['pendingOnly','completed'].includes(key)?typeof value!=='boolean':!['duration','monthDay','amountCents','initialBalanceCents','feeCents','weekdays'].includes(key)&&typeof value!=='string')throw new Error('助手返回的字段格式不正确，未执行')
   if(args.weekdays!==undefined&&(!Array.isArray(args.weekdays)||args.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
   if(args.note!==undefined&&args.note.length>1000)throw new Error('备注太长，请缩短后重试')
   const s=useStore.getState(), today=fmtDate(new Date())
@@ -61,7 +113,7 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
   const selectTask=()=>one(args.targetDate?taskList.filter(item=>item.recurrence!=='none'||item.scheduledDate===args.targetDate):taskList,args.query,taskLabel)
   const txnLabel=(item:Transaction)=>`${fmtDate(new Date(item.datetime))} ${item.type==='income'?'收入':'支出'} ${formatMoney(item.amount)} ${accountName(item.accountId)} ${item.note||''}`
   const txns=()=>s.transactions.filter(item=>inRange(fmtDate(new Date(item.datetime)),args)&&(!args.date||fmtDate(new Date(item.datetime))===date(args.date))&&(!args.type||item.type===args.type)&&(!args.account||item.accountId===account(args.account).id))
-  let run:(()=>void)|undefined, label='', guard='', calendar=false, untimedTask=false
+  let run:(()=>void)|undefined, label='', guard='', noteId:string|undefined, calendar=false, untimedTask=false
   if(args.action==='list_tasks') {
     const selected=taskList.filter(item=>!args.query||item.title.includes(args.query)||item.id===args.query)
     const start=args.date||args.startDate,end=args.date||args.endDate
@@ -73,27 +125,41 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
   }
   if(args.action==='add_task'||args.action==='update_task') {
     const current=args.action==='update_task'?selectTask():null
-    const recurrence=args.recurrence??current?.recurrence??'none'
-    if(!['none','daily','weekly','monthly'].includes(recurrence))throw new Error('重复方式不正确')
-    const patch:Partial<Task>={title:args.title!==undefined?text(args.title,'任务内容'):current?.title,scheduledDate:args.date!==undefined?date(args.date):current?.scheduledDate,scheduledTime:args.time!==undefined?(args.time===''?undefined:time(args.time)):current?.scheduledTime,recurrence:recurrence as Task['recurrence']}
-    if(!patch.title)throw new Error('请补充任务内容')
-    if(patch.scheduledTime&&!patch.scheduledDate&&recurrence==='none')throw new Error('请补充任务日期')
-    patch.isQuick=recurrence==='none'&&!patch.scheduledDate&&!patch.scheduledTime
-    patch.reminderEnabled=!!patch.scheduledTime&&(current?.reminderEnabled??true)
-    untimedTask=!patch.scheduledTime
-    if(args.duration!==undefined&&(!Number.isInteger(args.duration)||args.duration<1||args.duration>1440))throw new Error('请明确有效时长')
-    patch.duration=args.duration??current?.duration??30
-    patch.weekdays=args.weekdays??current?.weekdays;patch.monthDay=args.monthDay??current?.monthDay
-    if(recurrence==='weekly'&&(!patch.weekdays?.length||patch.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)))throw new Error('请明确每周哪几天')
-    if(recurrence==='monthly'&&(!Number.isInteger(patch.monthDay)||patch.monthDay!<1||patch.monthDay!>31))throw new Error('请明确每月几号')
-    label=`${patch.title} · ${recurrence==='none'?(patch.scheduledDate||'日期未定'):recurrenceShortLabel(patch as Task)} ${patch.scheduledTime||'时间未定'}`;calendar=true
+    const {patch,label:taskLabel}=taskFields(args,current)
+    label=taskLabel;calendar=true;untimedTask=!patch.scheduledTime
+    if(!current) {
+      const now=Date.now(),id=crypto.randomUUID()
+      const task={...patch,id,createdAt:now,updatedAt:now,categoryId:'',reminderLead:0} as Task
+      const draft:AgentTaskDraft={task,label}
+      if(args.completed||args.startedTime||args.completedTime||args.completedDate) {
+        const day=patch.scheduledDate||(args.completedDate?date(args.completedDate):today)
+        const endDay=args.completedDate?date(args.completedDate):day
+        const completedAt=args.completedTime?new Date(`${endDay}T${time(args.completedTime)}:00`).getTime():now
+        const startedAt=args.startedTime?new Date(`${day}T${time(args.startedTime)}:00`).getTime():undefined
+        if(args.completedDate&&!args.completedTime)throw new Error('请明确实际完成时间')
+        if(completedAt>now+60000||startedAt!==undefined&&startedAt>completedAt)throw new Error('请核对实际开始与完成时间，尚未保存')
+        if(!task.scheduledDate&&task.recurrence==='none'){
+          task.scheduledDate=day;task.isQuick=false
+          draft.label=`${task.title} · ${day} ${task.scheduledTime||'时间未定'}`
+        }
+        if(startedAt!==undefined&&args.duration===undefined)task.duration=Math.max(1,Math.round((completedAt-startedAt)/60000))
+        draft.record={id:`${id}-completed`,taskId:id,taskTitle:task.title,date:day,startedAt,completedAt,durationSeconds:startedAt===undefined?0:Math.round((completedAt-startedAt)/1000)}
+      }
+      if(args.sourceNote) {
+        const note=one(s.notes,args.sourceNote,item=>item.content)
+        draft.note={id:note.id,guard:JSON.stringify(note),label:note.content.slice(0,100)}
+      }
+      const category=s.categories.find(cat=>cat.id===args.category||cat.name===args.category)
+      if(category)draft.task.categoryId=category.id
+      return {text:label,modelStatus:'事项已整理，等待用户选择分类并保存，尚未写入',draft}
+    }
     if(current&&current.recurrence!=='none'&&args.date&&args.date!==(args.targetDate||today)) {
       const day=args.targetDate||today
       if(!taskOccursOnDate(current,new Date(day+'T00:00:00')))throw new Error('原日期没有这项习惯，请明确要移动哪一天')
       if(s.records.some(record=>record.taskId===current.id&&record.date===day))throw new Error('这一次已经完成，请明确要移动哪一天的未完成习惯')
       const {id,createdAt,updatedAt,...base}=current
       run=()=>{s.updateTask(current.id,{excludedDates:[...new Set([...(current.excludedDates||[]),day])]});s.addTask({...base,...patch,recurrence:'none',weekdays:undefined,monthDay:undefined,excludedDates:[],isQuick:false} as Omit<Task,'id'|'createdAt'|'updatedAt'>)}
-    } else run=current?()=>s.updateTask(current.id,patch):()=>s.addTask({...patch,categoryId:'work',reminderLead:0} as Omit<Task,'id'|'createdAt'|'updatedAt'>)
+    } else run=()=>s.updateTask(current.id,patch)
   } else if(args.action==='complete_task'||args.action==='update_completion_time'||args.action==='reopen_task') {
     if(args.action==='reopen_task'&&(args.time||args.completedTime||args.completedDate))throw new Error('修改完成时间请使用 update_completion_time；本次保留已完成状态')
     const task=selectTask(), taskRecords=s.records.filter(item=>item.taskId===task.id)
@@ -109,9 +175,10 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
       const completionDay=args.completedDate?date(args.completedDate):record?fmtDate(new Date(record.completedAt)):today
       const completedAt=completionTime?new Date(`${completionDay}T${time(completionTime)}:00`).getTime():record?.completedAt??Date.now()
       if(completedAt>Date.now()+60000)throw new Error('完成时间不能晚于现在，请核对实际完成日期和时间')
-      if(record?.startedAt!==undefined&&completedAt<record.startedAt)throw new Error('完成时间早于开始时间，请先核对开始时间；本次保留原记录')
+      const startedAt=record?.startedAt??(!record&&args.startedTime?new Date(`${day}T${time(args.startedTime)}:00`).getTime():undefined)
+      if(startedAt!==undefined&&completedAt<startedAt)throw new Error('完成时间早于开始时间，请先核对开始时间；本次保留原记录')
       if(completionTime)label+=`；完成时间 ${completionDay} ${completionTime}`
-      run=record?()=>{if(completionTime)s.updateRecord(record.id,{completedAt,durationSeconds:record.startedAt!==undefined?Math.round((completedAt-record.startedAt)/1000):record.durationSeconds})}:()=>s.addRecord({taskId:task.id,taskTitle:task.title,categoryId:task.categoryId,date:day,completedAt,durationSeconds:0})
+      run=record?()=>{if(completionTime)s.updateRecord(record.id,{completedAt,durationSeconds:record.startedAt!==undefined?Math.round((completedAt-record.startedAt)/1000):record.durationSeconds})}:()=>s.addRecord({taskId:task.id,taskTitle:task.title,categoryId:task.categoryId,date:day,startedAt,completedAt,durationSeconds:startedAt===undefined?0:Math.round((completedAt-startedAt)/1000)})
     }
   } else if(args.action==='delete_task') {
     const task=selectTask();label=task.title;guard=JSON.stringify(task);calendar=true;run=()=>s.deleteTask(task.id)
@@ -167,7 +234,7 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
   } else if(['add_note','update_note','delete_note'].includes(args.action)) {
     const current=args.action==='add_note'?null:one(s.notes,args.query,item=>item.content)
     if(args.action==='delete_note'){label=current!.content.slice(0,100);guard=JSON.stringify(current);run=()=>s.deleteNote(current!.id)}
-    else {const content=text(args.content,'笔记内容',10000);label=content.slice(0,100);run=current?()=>s.updateNote(current.id,content):()=>s.addNote(content)}
+    else {const content=text(args.content,'笔记内容',10000);label=content.slice(0,100);run=current?()=>s.updateNote(current.id,content):()=>{noteId=s.addNote(content)}}
   } else if(args.action==='add_transfer') {
     const from=account(args.fromAccount),to=account(args.toAccount)
     if(from.id===to.id)throw new Error('转出与转入不能是同一账户')
@@ -187,5 +254,5 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
     if(!isCalendarSyncEnabled())calendarText='；尚未开启系统日历同步'
     else try{const latest=useStore.getState();await syncTasksToCalendar(latest.tasks,latest.records);calendarText=untimedTask?'；补充具体时间后写入系统日历':'；已同步系统日历'}catch{calendarText='；日历同步暂未成功，请检查日历权限'}
   }
-  return {text:`${args.action.startsWith('delete_')?'已删除':args.action==='complete_task'?'已完成':args.action==='reopen_task'?'已恢复待办':'已保存'}：${label}${calendarText}`,modelStatus:'操作已在本机保存'+(calendar?`：${label}`:'')+(calendarText?'，日历状态已向用户显示':'')}
+  return {text:`${args.action.startsWith('delete_')?'已删除':args.action==='complete_task'?'已完成':args.action==='reopen_task'?'已恢复待办':'已保存'}：${label}${calendarText}`,modelStatus:'操作已在本机保存'+(calendar?`：${label}`:'')+(calendarText?'，日历状态已向用户显示':'')+(noteId?`，刚新增的笔记编号：${noteId}`:'')}
 }

@@ -57,12 +57,14 @@
 
 /* The cover screen reserves room for conversation and entries. */
 .agent-compact .agent-header{padding:6px 10px;gap:6px;flex-wrap:nowrap}
+.agent-name button{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .agent-compact .agent-header h1{font-size:16px;white-space:nowrap}
+.agent-compact .agent-name button{font-size:inherit}
 .agent-compact .agent-header button{font-size:11px;white-space:nowrap}
 .agent-compact .agent-messages{padding:6px 10px 10px}
 .agent-compact .agent-messages>div>div{padding:10px;margin-left:0;margin-right:0;font-size:13px;line-height:1.6}
 .agent-compact .agent-composer{padding:8px 10px}
-.agent-compact .voice-hold{height:52px;font-size:15px;line-height:1.2;white-space:nowrap}
+.agent-compact .voice-hold{height:60px;font-size:15px;line-height:1.2;white-space:nowrap}
 .voice-hold{contain:layout;-webkit-user-select:none;-webkit-touch-callout:none}
 .account-compact>header{padding:8px 10px}
 .account-compact>header>div:first-child{margin-bottom:8px;gap:6px}

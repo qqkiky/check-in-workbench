@@ -1,4 +1,3 @@
-import { DailyCoachCard } from '@/components/DailyCoachCard'
 import { TextInput } from '@/components/common/TextField'
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@/store'
@@ -296,7 +295,6 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
       </header>
       <div className="agenda-scroll flex-1 overflow-y-auto">
         {viewMode === 'today' && <>
-          {onOpenAgent && viewDateKey===fmtDate(today) && <DailyCoachCard onDiscuss={onOpenAgent}/>}
           <TodayAgenda agenda={agenda} categories={categories} compact={compact} onCheckIn={handleCheckIn} onEdit={id => {setEditingTaskId(id);setShowForm(true)}} onAdd={openAdd}/>
           <div className="agenda-timeline">
             <button className="text-sm text-gray-500 py-3" aria-expanded={showTimeline} onClick={() => toggleTimeline(!showTimeline)}>{showTimeline ? '收起时间线' : '查看时间线'}</button>

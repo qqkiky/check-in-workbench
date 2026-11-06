@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { showToast } from '@/components/common/Toast'
 import { chatWithAgent, clearAgentHistory, readAgentConfig, readAgentHistory, saveAgentConfig, saveAgentHistory, testAgent, type AgentConfig, type AgentHistory } from '@/services/agent'
-import { currentDailyReport, refreshDaily } from '@/services/coachDaily'
-import { readCoachFocus } from '@/services/coach'
+import { DailyCoachCard } from '@/components/DailyCoachCard'
+import { useStore } from '@/store'
+import { focusNotification, readCoachFocus } from '@/services/coach'
+import { fmtDate } from '@/utils/date'
 import { CoachSettings } from '@/components/CoachSettings'
-import { executeWorkbench, type PendingAgentAction } from '@/services/agentActions'
+import { executeWorkbench, saveAgentTasks, type AgentResult, type PendingAgentAction } from '@/services/agentActions'
 import { HoldGesture } from '@/services/holdGesture'
 import { HoldToTalk, NativeSpeech, type VoicePhase } from '@/services/voice'
 
@@ -19,8 +21,15 @@ const PRESETS=[
 export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest?:number;compact?:boolean}) {
   const [config,setConfig]=useState<AgentConfig>(()=>readAgentConfig()||{url:PRESETS[0].url,key:'',model:PRESETS[0].model})
   const [history,setHistory]=useState<AgentHistory>(readAgentHistory)
-  const [report,setReport]=useState(currentDailyReport)
-  useEffect(()=>{const update=()=>setReport(currentDailyReport());window.addEventListener('coach-daily-updated',update);void refreshDaily();return()=>window.removeEventListener('coach-daily-updated',update)},[])
+  const assistantName=useStore(s=>s.settings.assistantName)||'自律助手'
+  const updateSettings=useStore(s=>s.updateSettings)
+  const categories=useStore(s=>s.categories)
+  const [nameOpen,setNameOpen]=useState(false),[nameDraft,setNameDraft]=useState('')
+  const [batchId,setBatchId]=useState<string|null>(null)
+  const [choices,setChoices]=useState<Record<string,string>>({})
+  const batch=history.entries.find(entry=>entry.id===batchId)
+  const drafts=batch?.results?.filter(result=>result.draft)||[]
+  const saves=useRef(false)
   const [open,setOpen]=useState(()=>!readAgentConfig())
   const [busy,setBusy]=useState(false),[testing,setTesting]=useState(false)
   const [input,setInput]=useState(''),[showKey,setShowKey]=useState(false),[error,setError]=useState('')
@@ -32,7 +41,7 @@ export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest
   if(!voice.current)voice.current=new HoldToTalk(NativeSpeech,{phase:setVoicePhase,text:text=>voiceSend.current(text),error:setError})
   const voiceActive=voicePhase!=='idle'
   const beginVoice=useRef(()=>{});beginVoice.current=startVoice
-  if(!gesture.current)gesture.current=new HoldGesture({start:()=>beginVoice.current(),release:()=>voice.current?.release(),cancel:()=>voice.current?.cancel(),changed:setCancelVoice})
+  if(!gesture.current)gesture.current=new HoldGesture({start:()=>beginVoice.current(),release:()=>voice.current?.release(),cancel:()=>voice.current?.cancel(),changed:setCancelVoice,interrupted:()=>setError('外屏触控中断，本条语音未发送。请重新按住说话。')})
   useEffect(()=>{if(quickChatRequest)setVoiceMode(true)},[quickChatRequest])
   const bottom=useRef<HTMLDivElement>(null)
   useEffect(()=>{bottom.current?.scrollIntoView({block:'end'})},[history,busy])
@@ -41,6 +50,7 @@ export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest
     window.addEventListener('agent-history-saved',refresh)
     return ()=>window.removeEventListener('agent-history-saved',refresh)
   },[busy])
+  const compactRef=useRef(compact);compactRef.current=compact
   useEffect(()=>{
     const cancel=()=>{gesture.current?.cancel();setCancelVoice(false);voice.current?.cancel()}
     const hidden=()=>{if(document.visibilityState!=='visible')cancel()}
@@ -50,24 +60,66 @@ export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest
     const up=(e:PointerEvent)=>{if(e.pointerType!=='touch')gesture.current?.end(e.pointerId)}
     const cancelled=(e:PointerEvent)=>{if(e.pointerType!=='touch')gesture.current?.end(e.pointerId,true)}
     const move=(e:TouchEvent)=>{for(const t of Array.from(e.changedTouches))gesture.current?.move(t.identifier,t.clientY)}
-    const end=(e:TouchEvent)=>{for(const t of Array.from(e.changedTouches))gesture.current?.end(t.identifier,e.type==='touchcancel')}
+    const end=(e:TouchEvent)=>{
+      for(const t of Array.from(e.changedTouches)){
+        if(e.type==='touchcancel'&&compactRef.current)gesture.current?.interrupt(t.identifier)
+        else gesture.current?.end(t.identifier,e.type==='touchcancel')
+      }
+    }
     window.addEventListener('pointerup',up);window.addEventListener('pointercancel',cancelled)
     window.addEventListener('touchmove',move);window.addEventListener('touchend',end);window.addEventListener('touchcancel',end)
     return ()=>{document.removeEventListener('visibilitychange',hidden);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',cancelled);window.removeEventListener('touchmove',move);window.removeEventListener('touchend',end);window.removeEventListener('touchcancel',end);cancel()}
   },[])
   async function send(message=input,fromVoice=false) {
-    if(!message.trim()||busy)return
+    if(!message.trim()||busy||batchId)return
     const saved=readAgentConfig();if(!saved){setOpen(true);return}
     setBusy(true);setError('');if(!fromVoice)setInput('')
-    try{setHistory(await chatWithAgent(saved,history,message))}
+    try {
+      const next=await chatWithAgent(saved,history,message)
+      const entry=next.entries[next.entries.length-1]
+      const proposals=entry?.results?.filter(result=>result.draft)||[]
+      setHistory(next)
+      if(entry&&proposals.length){
+        setChoices({})
+        setBatchId(entry.id)
+      }
+    }
     catch(e){if(fromVoice){setInput(previous=>previous?previous+'\n'+message:message);setVoiceMode(false)}else setInput(message);setError(e instanceof Error?e.message:'AI 请求失败')}
     finally{setBusy(false)}
   }
   voiceSend.current=text=>void send(text,true)
   function startVoice() {
-    if(busy||testing||open||voiceActive)return
+    if(busy||testing||open||voiceActive||batchId||nameOpen)return
     if(!readAgentConfig()){setOpen(true);return}
     setError('');setCancelVoice(false);void voice.current?.press()
+  }
+  async function finishDrafts(save:boolean) {
+    if(!batch||!drafts.length||saves.current)return
+    saves.current=true;setBusy(true);setError('')
+    try {
+      const cancelled={text:'已取消，草稿未保存',modelStatus:'用户取消新增事项'}
+      const outcomes=save?await saveAgentTasks(drafts.map(({draft})=>({draft:draft!,categoryId:choices[draft!.task.id]}))):drafts.map(()=>cancelled)
+      if(save&&drafts.length===1){
+        const {task,record}=drafts[0].draft!
+        focusNotification(task.id,record?.date||task.scheduledDate||fmtDate(new Date()))
+      }
+      const replacements=new Map<string,AgentResult>()
+      drafts.forEach(({callId,draft},i)=>{
+        if(callId)replacements.set(callId,outcomes[i])
+        if(draft!.note?.callId)replacements.set(draft!.note.callId,{text:save?'已删除指定原笔记':'原笔记保留',modelStatus:save?'已删除指定原笔记':'未删除原笔记'})
+        if(draft!.completionCallId)replacements.set(draft!.completionCallId,{text:save?'已标记完成':'未标记完成',modelStatus:save?'操作已在本机保存，已标记完成':'未标记完成'})
+      })
+      const next={...history,messages:history.messages.map(message=>{
+        const result=message.tool_call_id&&replacements.get(message.tool_call_id)
+        return message.role==='tool'&&result?{...message,content:JSON.stringify({status:result.modelStatus})}:message
+      }),entries:history.entries.map(entry=>entry.id===batch.id?{...entry,results:entry.results?.map(old=>{
+        const replacement=old.callId&&replacements.get(old.callId)
+        return replacement?{...replacement,callId:old.callId}:old
+      })}:entry)}
+      setHistory(next);setBatchId(null)
+      await saveAgentHistory(next)
+    } catch(e){setError(e instanceof Error?e.message:'事项保存失败，请重试')}
+    finally{saves.current=false;setBusy(false)}
   }
   async function confirmDelete(entryId:string,index:number,pending:PendingAgentAction) {
     setBusy(true);setError('')
@@ -86,7 +138,7 @@ export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest
   }
   return <div className={"agent-screen flex flex-col min-h-0 h-full "+(compact?"agent-compact":"")}>
     <header className="agent-header px-4 pt-3 pb-3 flex flex-wrap gap-2 items-center justify-between shrink-0">
-      <h1 className="text-xl font-medium text-gray-900">{compact?'助手':'自律助手'}</h1>
+      <h1 className="agent-name text-xl font-medium text-gray-900 min-w-0"><button type="button" title="修改助手名字" aria-label={`${assistantName}，修改助手名字`} disabled={busy||voiceActive} onClick={()=>{setNameDraft(assistantName==='自律助手'?'':assistantName);setNameOpen(true)}}>{assistantName} <span aria-hidden="true" className="text-primary text-xs">✎</span></button></h1>
       <div className="flex items-center gap-2 text-xs">
         <CoachSettings disabled={busy||voiceActive}/>
         <button disabled={busy||testing||voiceActive} onClick={async()=>{await clearAgentHistory();setHistory({messages:[],entries:[]});setError('')}} className="agent-clear text-gray-500 disabled:opacity-40">{compact?'清空':'清空对话'}</button>
@@ -94,7 +146,7 @@ export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest
       </div>
     </header>
     {readCoachFocus()&&<p className="px-4 pb-2 text-xs text-primary break-words">正在聊：{readCoachFocus()!.title} · {readCoachFocus()!.date}</p>}
-    {report?.question&&<p className="px-3 pb-2 text-xs text-primary break-words" title={report.question}>{report.question}</p>}
+    <DailyCoachCard onDiscuss={()=>bottom.current?.scrollIntoView({block:'end'})}/>
     <div className="agent-messages flex-1 min-h-0 overflow-y-auto px-4 pb-3 space-y-3">
       {!history.entries.length&&<div className="bg-white rounded-2xl p-4 text-sm text-gray-600 space-y-3">
         <p>告诉我你的目标，或者直接交代今天要做的事。我会和你确定计划，记住你的承诺，认真跟进。</p>
@@ -106,6 +158,7 @@ export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest
           {entry.text&&<p>{entry.text}</p>}
           {entry.results?.map((result,i)=><div key={i} className={i?'border-t border-gray-100 mt-3 pt-3':''}>
             {entry.text&&result.modelStatus.startsWith("操作已在本机保存")&&!result.pending?<details className="mt-2 text-xs text-gray-500"><summary className="cursor-pointer text-primary">已保存 · 查看详情</summary><p className="mt-2">{result.text}</p></details>:<p>{result.text}</p>}
+            {result.draft&&<button type="button" className="mt-2 text-primary" onClick={()=>{setChoices({});setBatchId(entry.id)}}>选择分类并保存</button>}
             {result.pending&&<div className="flex gap-3 mt-3">
               <button disabled={busy||voiceActive} onClick={()=>void cancelDelete(entry.id,i)} className="px-3 py-2 rounded-xl bg-gray-100 disabled:opacity-40">取消</button>
               <button disabled={busy||voiceActive} onClick={()=>void confirmDelete(entry.id,i,result.pending!)} className="px-3 py-2 rounded-xl bg-red-500 text-white disabled:opacity-40">确认删除</button>
@@ -123,8 +176,8 @@ export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest
         {voiceMode?<button type="button" disabled={busy||voicePhase==='finishing'} aria-label="按住说话" aria-pressed={voicePhase==='listening'}
           className={`voice-hold flex-1 min-w-0 h-16 px-2 py-2 rounded-2xl border text-base font-medium select-none disabled:opacity-40 ${cancelVoice?'bg-red-500 text-white border-red-500':voiceActive?'bg-primary text-white border-primary':'bg-gray-100 text-gray-700 border-gray-200'}`}
           style={{touchAction:'none'}} onContextMenu={e=>e.preventDefault()}
-          onTouchStart={e=>{if(busy||voiceActive||e.touches.length!==1)return;const t=e.changedTouches[0];gesture.current?.begin(t.identifier,t.clientY)}}
-          onPointerDown={e=>{if(e.pointerType==='touch'||!e.isPrimary||e.button!==0||busy||voiceActive)return;e.preventDefault();gesture.current?.begin(e.pointerId,e.clientY)}}
+          onTouchStart={e=>{if(busy||!compact&&voiceActive||e.touches.length!==1)return;const t=e.changedTouches[0];if(t)gesture.current?.begin(t.identifier,t.clientY,t.clientX)}}
+          onPointerDown={e=>{if(e.pointerType==='touch'||!e.isPrimary||e.button!==0||busy||voiceActive)return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);gesture.current?.begin(e.pointerId,e.clientY,e.clientX)}}
           onPointerMove={e=>{if(e.pointerType!=='touch')gesture.current?.move(e.pointerId,e.clientY)}}
           onKeyDown={e=>{if(e.key==='Escape'){gesture.current?.cancel();voice.current?.cancel();return}if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();startVoice()}}}
           onKeyUp={e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();voice.current?.release()}}}
@@ -135,6 +188,43 @@ export function AgentScreen({quickChatRequest=0,compact=false}:{quickChatRequest
       </div>
       {voiceMode&&!compact&&<p className="mt-2 text-[10px] text-gray-400">单次最长60秒。系统语音识别可能联网；识别文字自动发给当前 AI，应用不保存录音。首次允许麦克风后，请重新按住说话。</p>}
     </form>
+    <Modal open={nameOpen} onClose={()=>setNameOpen(false)} title="给助手起个名字">
+      <form className="space-y-3" onSubmit={e=>{
+        e.preventDefault()
+        const name=String(new FormData(e.currentTarget).get('assistantName')||'').trim()
+        updateSettings({assistantName:name||undefined})
+        setNameOpen(false)
+        showToast(name?`助手已改名为${name}`:'已恢复默认名称')
+      }}>
+        <label className="block text-sm">助手名字<TextInput name="assistantName" value={nameDraft} onChange={e=>setNameDraft(e.target.value)} maxLength={20} placeholder="例如球球，留空恢复默认名称" className="block w-full mt-2 p-3 rounded-xl border text-base"/></label>
+        <button className="w-full rounded-xl bg-primary text-white p-3">保存名字</button>
+      </form>
+    </Modal>
+    <Modal open={!!batch&&drafts.length>0} onClose={()=>{if(!busy)void finishDrafts(false)}} title={`确认 ${drafts.length} 项新事项`} footer={
+      <div className="flex gap-2">
+          <button disabled={busy} onClick={()=>void finishDrafts(false)} className="rounded-xl px-3 py-2.5 bg-gray-100 text-sm">取消</button>
+          <button disabled={busy||!drafts.every(({draft})=>categories.some(category=>category.id===choices[draft!.task.id]))} onClick={()=>void finishDrafts(true)} className="flex-1 rounded-xl px-2 py-2.5 bg-primary text-sm whitespace-nowrap text-white disabled:opacity-40">{busy?'保存中…':drafts.some(({draft})=>draft?.note)?'保存并删除原笔记':'一起保存'}</button>
+        </div>
+    }>
+      <div className="space-y-3">
+        {drafts.map(({draft})=>{
+          const {task,label,record,note}=draft!
+          const suggestion=categories.find(category=>category.id===task.categoryId)
+          return <section key={task.id} className="rounded-xl border border-gray-100 p-3 space-y-2">
+            <h3 className="font-semibold break-words">{task.title}</h3>
+            <p className="text-xs text-gray-600 break-words">{label.slice(task.title.length+3)}{task.scheduledTime&&task.duration?` · ${task.duration} 分钟`:''}{record&&<span className="whitespace-nowrap"> · 已完成</span>}</p>
+            {record&&<p className="text-xs text-gray-600">实际完成 {new Date(record.completedAt).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</p>}
+            {suggestion&&<p className="text-xs text-gray-500">建议分类 · {suggestion.name}</p>}
+            <div className="flex flex-wrap gap-2" role="group" aria-label={`${task.title}的分类`}>
+              {categories.map(category=><button type="button" key={category.id} disabled={busy} aria-pressed={choices[task.id]===category.id} className={`inline-flex gap-1 items-center rounded-lg border px-2.5 py-1.5 text-xs ${choices[task.id]===category.id?'border-primary bg-primary/10 text-primary':'border-gray-200 text-gray-700'}`} onClick={()=>setChoices(prev=>({...prev,[task.id]:category.id}))}>{category.name}</button>)}
+            </div>
+            {note&&<p className="text-xs text-red-600 break-words">同时删除原笔记「{note.label}」</p>}
+          </section>
+        })}
+        {error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
+
+      </div>
+    </Modal>
     <Modal open={open} onClose={()=>{if(!testing)setOpen(false)}} title="AI 服务设置">
       <form noValidate className="space-y-4" onSubmit={async e=>{
         e.preventDefault()
