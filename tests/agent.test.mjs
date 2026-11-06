@@ -292,6 +292,12 @@ test('a model cannot silently invent a clock time from later while I am still at
 });
 
 
+function yesterdayDate() {
+ const day=new Date();
+ day.setDate(day.getDate()-1);
+ return [day.getFullYear(),String(day.getMonth()+1).padStart(2,'0'),String(day.getDate()).padStart(2,'0')].join('-');
+}
+
 test('completed spoken activity retries a note misclassification and waits for one batch of categories',async()=>{
  const {fixture:f,service:a}=await load(),original=globalThis.fetch;
  const config={url:'https://api.example/v1',key:'TEST_KEY',model:'test'};
@@ -301,7 +307,7 @@ test('completed spoken activity retries a note misclassification and waits for o
   requests++;
   assert.match(options.body,/生活/);
   return Response.json({choices:[{message:{tool_calls:requests===1?[tool('bad-note',{action:'add_note',content:'敷面膜'})]:[
-   tool('mask',{action:'add_task',title:'敷面膜',date:'2026-11-06',time:'22:41',startedTime:'22:41',duration:15}),
+   tool('mask',{action:'add_task',title:'敷面膜',date:yesterdayDate(),time:'22:41',startedTime:'22:41',duration:15}),
    tool('done',{action:'complete_task',query:'敷面膜',completedTime:'22:56'}),
    tool('read',{action:'add_task',title:'看书',category:'阅读'}),
   ]}}]});
@@ -325,7 +331,7 @@ test('converting a note is guarded, confirms completion, and deleting a note nev
  const first=await a.executeWorkbench({action:'add_note',content:'晚上敷面膜15分钟'});
  const original=f.state.notes[0],keep=f.state.addNote('别的笔记');
  assert.match(first.modelStatus,new RegExp(original.id));
- const args={action:'add_task',title:'敷面膜',sourceNote:original.id,date:'2026-11-06',time:'22:41',startedTime:'22:41',completedTime:'22:56',duration:15};
+ const args={action:'add_task',title:'敷面膜',sourceNote:original.id,date:yesterdayDate(),time:'22:41',startedTime:'22:41',completedTime:'22:56',duration:15};
  const {draft}=await a.executeWorkbench(args);
  assert.equal(f.state.notes.length,2);assert.equal(f.state.tasks.length,0);
  f.state.updateNote(original.id,'敷面膜已补充');
