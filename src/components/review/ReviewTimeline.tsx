@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { DayTimelineItem } from '@/utils/timeline'
-import { minuteClock, overlapOffsets, timelineBounds, timelineSpan } from '@/utils/review'
+import { minuteClock, overlapOffsets, timelineBounds, timelineSpan, visibleRailTicks } from '@/utils/review'
 import { secondsToCompact } from '@/utils/date'
 import { ReviewEmpty } from './ReviewParts'
 
@@ -8,6 +8,27 @@ const titleOf=(it:DayTimelineItem)=>it.title||it.content||'未命名事项'
 const itemKey=(it:DayTimelineItem)=>it.type+'-'+it.id
 const tint=(color:string,alpha:number)=>`color-mix(in srgb, ${color} ${alpha}%, transparent)`
 type Bounds=ReturnType<typeof timelineBounds>
+
+function RailTicks({ticks,position}:{ticks:number[];position:(minute:number)=>number}){
+  const axis=useRef<HTMLDivElement>(null)
+  const [visible,setVisible]=useState<boolean[]>([])
+  const tickKey=ticks.join(',')
+  useLayoutEffect(()=>{
+    const element=axis.current!
+    const labels=Array.from(element.querySelectorAll('span'))
+    const update=()=>setVisible(visibleRailTicks(labels.map(label=>label.getBoundingClientRect())))
+    const observer=new ResizeObserver(update)
+    observer.observe(element)
+    labels.forEach(label=>observer.observe(label))
+    update()
+    return ()=>observer.disconnect()
+  },[tickKey])
+  return <div className="rv-rail-ticks" ref={axis}>{ticks.map((t,i)=><span key={t} style={{
+    left:position(t)+'%',
+    transform:i===0?'none':i===ticks.length-1?'translateX(-100%)':'translateX(-50%)',
+    visibility:visible[i]===false?'hidden':undefined,
+  }}>{minuteClock(t)}{t>=1440?'⁺':''}</span>)}</div>
+}
 
 export function TimeRail({items,bounds=timelineBounds(items),onJump,showTicks=true}:{items:DayTimelineItem[];bounds?:Bounds;onJump?:(minute:number)=>void;showTicks?:boolean}){
   const lanes=overlapOffsets(items)
@@ -22,7 +43,7 @@ export function TimeRail({items,bounds=timelineBounds(items),onJump,showTicks=tr
         return <span key={itemKey(it)} title={titleOf(it)} className={span.point?'rv-rail-point':'rv-rail-block'} style={{left:span.point?`clamp(3px, ${pos(span.start)}%, calc(100% - 3px))`:pos(span.start)+'%',...(span.point?{backgroundColor:it.color}:{width:Math.max(.25,pos(span.end)-pos(span.start))+'%',top:2+Math.min(2,lanes[i])*2,backgroundColor:tint(it.color,57)})}}/>
       })}
     </div>
-    {showTicks&&<div className="rv-rail-ticks">{ticks.map((t,i)=><span key={t} style={{left:pos(t)+'%',transform:i===0?'none':i===ticks.length-1?'translateX(-100%)':'translateX(-50%)'}}>{minuteClock(t)}{t>=1440?'⁺':''}</span>)}</div>}
+    {showTicks&&<RailTicks ticks={ticks} position={pos}/>}
   </div>
 }
 

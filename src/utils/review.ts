@@ -80,6 +80,17 @@ export function timelineBounds(items:DayTimelineItem[]){
   const spans=items.map(timelineSpan)
   return {start:Math.min(480,...spans.map(x=>Math.floor(x.start/60)*60)),end:Math.max(1320,...spans.map(x=>Math.ceil(x.end/60)*60))}
 }
+export function visibleRailTicks(labels:{left:number;right:number}[], gap=4){
+  const last=labels.length-1
+  if(last<1)return labels.map(()=>true)
+  let previousRight=labels[0].right
+  return labels.map(({left,right},i)=>{
+    if(i===0||i===last)return true
+    if(left<previousRight+gap||right+gap>labels[last].left)return false
+    previousRight=right
+    return true
+  })
+}
 export function overlapOffsets(items:DayTimelineItem[]){
   const laneEnds:number[]=[]
   return items.map(item=>{

@@ -19,6 +19,8 @@ export function WeeklyReview() {
   }),[startKey,mode,records,timelineEntries,categories])
   const selectedDay=dayList.find(d=>d.key===selected)||dayList[mode-1]
   const bounds=timelineBounds(dayList.flatMap(d=>d.items))
+  const countDigits=String(Math.max(...dayList.map(day=>day.items.length))).length
+  const columns={gridTemplateColumns:`49px minmax(0,1fr) max(30px, calc(${countDigits}ch + 18px))`}
   const shift=(step:number)=>{
     const next=dt.addDays(anchor,step*mode)
     setAnchor(next);setSelected(fmtDate(next))
@@ -33,8 +35,8 @@ export function WeeklyReview() {
     </section>):<>
       <section className="rv-card">
         <div className="rv-card-heading"><h3>七天时段</h3><span className="rv-muted">点日期看当天</span></div>
-        <div className="rv-week-scale"><TimeRail items={[]} bounds={bounds}/></div>
-        {dayList.map(day=><button type="button" className="rv-week-row" key={day.key} aria-pressed={selectedDay.key===day.key} onClick={()=>setSelected(day.key)}>
+        <div className="rv-week-scale" style={columns}><TimeRail items={[]} bounds={bounds}/></div>
+        {dayList.map(day=><button type="button" className="rv-week-row" style={columns} key={day.key} aria-pressed={selectedDay.key===day.key} onClick={()=>setSelected(day.key)}>
           <span className="rv-week-label">{day.d.getDate()} <small>{REVIEW_WEEKDAYS[day.d.getDay()]}</small></span>
           <TimeRail items={day.items} bounds={bounds} showTicks={false}/>
           <span className="rv-muted">{day.items.length} 条</span>

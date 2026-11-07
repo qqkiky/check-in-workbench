@@ -71,11 +71,12 @@
 .rv-rail-block {height:12px;border-radius:4px}
 .rv-rail-ticks {position:relative;height:18px;margin-top:3px;font-size:9px;color:var(--rv-muted)}
 .rv-rail-ticks span {position:absolute;white-space:nowrap}
-.rv-week-scale {margin:0 34px 0 53px}
+.rv-week-scale,.rv-week-row {display:grid;gap:4px;font-size:11px}
+.rv-week-scale .rv-rail-wrap {grid-column:2}
 .rv-week-scale .rv-rail {display:none}
-.rv-week-row {display:grid;grid-template-columns:49px minmax(0,1fr) 30px;gap:4px;align-items:center;width:100%;padding:7px 0;border-radius:8px;text-align:left}
+.rv-week-row {align-items:center;width:100%;padding:7px 0;border-radius:8px;text-align:left}
 .rv-week-row[aria-pressed=true] {background:var(--rv-selected)}
-.rv-week-row>span:last-child {text-align:right;padding-right:3px}
+.rv-week-row>span:last-child {text-align:right;padding-right:3px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .rv-week-label {padding-left:4px;font-size:12px;font-weight:650;white-space:nowrap}
 .rv-week-label small {font-size:10px;font-weight:400;color:var(--rv-muted)}
 .rv-item {display:grid;grid-template-columns:8px auto minmax(0,1fr) auto;gap:6px;align-items:start;padding:9px 0;border-top:1px solid var(--rv-line);font-size:12px}

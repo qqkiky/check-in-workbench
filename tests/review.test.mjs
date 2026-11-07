@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { build } from 'esbuild'
 
 const bundle=await build({stdin:{contents:"export * from './src/utils/review.ts';export * from './src/utils/timeline.ts'",resolveDir:process.cwd()},bundle:true,format:'esm',platform:'node',write:false})
-const {buildDayTimeline,timelineSpan,timelineBounds,overlapOffsets,monthlyInvestment,reviewGroups,calendarCounts,monthDays,mondayPadding}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'))
+const {buildDayTimeline,timelineSpan,timelineBounds,visibleRailTicks,overlapOffsets,monthlyInvestment,reviewGroups,calendarCounts,monthDays,mondayPadding}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'))
 const day='2026-11-05'
 const at=(h,m,s=0)=>new Date(2026,10,5,h,m,s).getTime()
 const record=(id,date=day,categoryId='work',durationSeconds=60)=>({id,taskId:id,taskTitle:id,date,categoryId,completedAt:at(14,0),durationSeconds})
@@ -46,4 +46,14 @@ test('review groups keep distinct tasks even when titles match and preserve zero
  assert.equal(calendarCounts(rows).get(day),3)
  assert.equal(monthDays(2028,1).length,29)
  assert.equal(mondayPadding(monthDays(2026,10)[0]),6)
+})
+
+test('rail keeps the range endpoints and suppresses intermediate labels that collide',()=>{
+ const labels=[[0,24],[31,55],[61,85],[91,115],[103,132]].map(([left,right])=>({left,right}))
+ assert.deepEqual(visibleRailTicks(labels),[true,true,true,false,true])
+ const wider=labels.map(({left,right},i)=>{
+  const shift=i*20
+  return {left:left+shift,right:right+shift}
+ })
+ assert.deepEqual(visibleRailTicks(wider),[true,true,true,true,true])
 })
