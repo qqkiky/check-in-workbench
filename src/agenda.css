@@ -70,9 +70,10 @@
 .account-compact>header>div:first-child{margin-bottom:8px;gap:6px}
 .account-compact h1{font-size:17px;white-space:nowrap}
 .account-compact>header button{font-size:11px;padding-left:8px;padding-right:8px}
-.account-compact .account-summary{display:flex;flex-direction:column;gap:4px;padding:8px 10px}
-.account-compact .account-summary>div{display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:center;gap:8px;border:0;min-width:0}
-.account-compact .account-summary>div>div:first-child{font-size:16px;line-height:1.4;overflow-wrap:anywhere;min-width:0}
-.account-compact .account-summary>div>div:last-child{font-size:11px;flex-shrink:0}
+.account-summary{--account-summary-base:1.25rem}
+.account-summary-stats{--account-summary-base:1.125rem}
+.account-summary-value{display:flex;align-items:center;justify-content:center;height:calc(var(--account-summary-base)*1.4)}
+.account-summary-amount{flex:none;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:var(--account-amount-size,var(--account-summary-base));line-height:1}
+.account-compact .account-summary{--account-summary-base:1rem;gap:4px;padding:8px 10px}
 .account-compact>header>div:last-child{margin-top:8px}
 .account-compact>div.overflow-y-auto{padding-bottom:12px;min-height:0}

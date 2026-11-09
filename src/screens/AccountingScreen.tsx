@@ -17,6 +17,7 @@ import { useStore } from '@/store'
 import { Icons } from '@/components/common/Icons'
 import { TransactionModal } from '@/components/accounting/TransactionModal'
 import { AccountModal } from '@/components/accounting/AccountModal'
+import { AccountingSummary } from '@/components/accounting/AccountingSummary'
 import { AcctCategoryModal } from '@/components/accounting/AcctCategoryModal'
 import { TransferModal } from '@/components/accounting/TransferModal'
 import {
@@ -295,20 +296,7 @@ export function AccountingScreen({compact=false}:{compact?:boolean}) {
           </button>
         </div>
 
-        <div className="account-summary bg-white rounded-2xl p-3 shadow-card grid grid-cols-3 gap-2">
-          <div className="text-center">
-            <div className="text-xl font-bold text-green-600">{formatMoney(monthSummary.income)}</div>
-            <div className="text-[11px] text-gray-500 mt-0.5">收入</div>
-          </div>
-          <div className="text-center border-l border-r border-gray-100">
-            <div className="text-xl font-bold text-red-500">{formatMoney(monthSummary.expense)}</div>
-            <div className="text-[11px] text-gray-500 mt-0.5">支出</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xl font-bold text-gray-900">{formatMoney(monthSummary.balance)}</div>
-            <div className="text-[11px] text-gray-500 mt-0.5">结余</div>
-          </div>
-        </div>
+        <AccountingSummary summary={monthSummary} />
 
         {/* 子导航 */}
         <div className="mt-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
@@ -597,20 +585,7 @@ export function AccountingScreen({compact=false}:{compact?:boolean}) {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-3 shadow-card grid grid-cols-3 gap-2">
-              <div className="text-center">
-                <div className="text-lg font-bold text-green-600">{formatMoney(statData.summary.income)}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5">收入</div>
-              </div>
-              <div className="text-center border-l border-r border-gray-100">
-                <div className="text-lg font-bold text-red-500">{formatMoney(statData.summary.expense)}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5">支出</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-900">{formatMoney(statData.summary.balance)}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5">结余</div>
-              </div>
-            </div>
+            <AccountingSummary summary={statData.summary} stats />
 
             {/* 每日/每月收支柱状图 */}
             <div className="bg-white rounded-2xl p-4 shadow-card">
