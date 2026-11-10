@@ -127,6 +127,14 @@ public class TaskCalendarPlugin extends Plugin {
         runIO(() -> {
             try {
                 int synced = 0;
+                Set<String> plannedKeys=new HashSet<>();
+                com.getcapacitor.JSArray plannedIds=call.getArray("plannedTaskIds");
+                String fromDate=call.getString("fromDate","");
+                Set<String> plannedTaskIds=new HashSet<>();
+                if(plannedIds!=null){
+                    if(!fromDate.matches("\\d{4}-\\d{2}-\\d{2}"))throw new Exception("缺少日历计划起始日期");
+                    for(int i=0;i<plannedIds.length();i++)plannedTaskIds.add(plannedIds.getString(i));
+                }
                 com.getcapacitor.JSArray results = new com.getcapacitor.JSArray();
                 for (int i = 0; i < tasks.length(); i++) {
                     JSONObject t = tasks.getJSONObject(i);
@@ -134,6 +142,7 @@ public class TaskCalendarPlugin extends Plugin {
                     if (TextUtils.isEmpty(taskId)) continue;
                     String title = t.optString("title", "待办");
                     long start = (long) t.optDouble("startMillis", 0);
+                    plannedKeys.add(taskId);
                     if (start <= 0) continue;
                     long end = (long) t.optDouble("endMillis", 0);
                     if (end <= start) end = start + DEFAULT_EVENT_DURATION_MS;
@@ -150,6 +159,9 @@ public class TaskCalendarPlugin extends Plugin {
                 JSObject res = new JSObject();
                 res.put("ok", true);
                 res.put("synced", synced);
+                synchronized (CalendarRepository.class) {
+                    res.put("removed",new CalendarRepository(getContext()).pruneOccurrences(plannedTaskIds,plannedKeys,fromDate));
+                }
                 res.put("results", results);
                 call.resolve(res);
             } catch (Exception e) {

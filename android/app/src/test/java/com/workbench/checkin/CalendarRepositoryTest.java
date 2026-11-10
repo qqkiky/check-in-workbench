@@ -61,6 +61,27 @@ public class CalendarRepositoryTest {
         assertEquals(2,repository.pruneTasks(Collections.emptySet()));assertFalse(provider.events.containsKey(own));assertFalse(provider.events.containsKey(other));
         assertEquals("personal",provider.events.get(900L).getAsString(Events.TITLE));assertFalse(provider.reminders.contains(own));assertEquals(0,repository.collectDeletions().length());
     }
+    @Test public void changingRecurrenceRemovesOnlyObsoleteFutureEventsAndTheirReminders() throws Exception {
+        String habit="habit", keep=habit+"@2026-11-12";
+        long past=add(habit+"@2026-11-09"), today=add(habit+"@2026-11-10"), future=add(habit+"@2026-11-11");
+        long scheduled=add(keep), other=add("other@2026-11-11");
+        repository.selectCalendars(new JSONArray("[2]"));
+        ContentValues personal=new ContentValues(provider.events.get(future));
+        personal.put(Events._ID,900L);personal.put(Events.CALENDAR_ID,2L);
+        provider.events.put(900L,personal);provider.reminders.add(900L);
+        repository.bindExisting(habit+"@2026-11-13",900L);
+
+        assertEquals(2,repository.pruneOccurrences(Collections.singleton(habit),Collections.singleton(keep),"2026-11-10"));
+        assertFalse(provider.events.containsKey(today));assertFalse(provider.events.containsKey(future));
+        assertFalse(provider.reminders.contains(today));assertFalse(provider.reminders.contains(future));
+        assertTrue(provider.events.containsKey(past));assertTrue(provider.events.containsKey(scheduled));assertTrue(provider.events.containsKey(other));
+        assertTrue(provider.events.containsKey(900L));assertTrue(provider.reminders.contains(900L));
+        assertEquals(0,repository.collectDeletions().length());
+        assertEquals(0,repository.pruneOccurrences(Collections.singleton(habit),Collections.singleton(keep),"2026-11-10"));
+        assertEquals(1,repository.pruneOccurrences(Collections.singleton(habit),Collections.emptySet(),"2026-11-10"));
+        assertFalse(provider.events.containsKey(scheduled));
+        assertTrue(add(habit+"@2026-11-11")>0);
+    }
     @Test public void removedTaskCannotBeResurrectedByAnOlderBackgroundSnapshot() throws Exception {
         String key="one@2026-11-02";add(key);repository.blockTask("one");repository.deleteEvent(key);
         assertEquals(0,add(key));repository.allowTask(key);assertTrue(add(key)>0);

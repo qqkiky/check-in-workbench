@@ -11,7 +11,8 @@ import { Capacitor } from '@capacitor/core'
 import { registerPlugin } from '@capacitor/core'
 import type { Task, CheckInRecord } from '@/types'
 import { appStorage, flushPrivateStorage } from '@/services/appStorage'
-import { buildCalendarEvents } from '@/services/calendarPlan'
+import { buildCalendarEvents, type CalendarEvent } from '@/services/calendarPlan'
+import { fmtDate } from '@/utils/date'
 import { useStore } from '@/store'
 import { planCalendarUpdates, type CalendarUpdate } from '@/services/calendarUpdates'
 import { storage } from '@/services/storage'
@@ -25,7 +26,7 @@ interface TaskCalendarPlugin {
     reminderLeadMin: number
     description?: string
   }): Promise<{ ok: boolean; eventId: number }>
-  syncAll(opts: { tasks: any[] }): Promise<{ ok: boolean; synced: number }>
+  syncAll(opts: { tasks: CalendarEvent[]; plannedTaskIds: string[]; fromDate: string }): Promise<{ ok: boolean; synced: number; removed: number }>
   removeTask(opts: { taskId: string }): Promise<{ ok: boolean; removed: number }>
   reconcile(opts:{fullSnapshot:boolean;activeTaskIds:string[]}):Promise<{removed:number;deletedKeys:string[];changes?:CalendarUpdate[];newEvents?:CalendarUpdate[]}>
   getCalendars():Promise<{calendars:CalendarSource[]}>
@@ -143,8 +144,14 @@ function performSync(requested:Set<string>|null,fullSnapshot:boolean):Promise<Ca
     await flushPrivateStorage()
     const latest=useStore.getState(),tasks=requested?latest.tasks.filter(task=>requested.has(task.id)):latest.tasks
     for(const task of tasks.filter(task=>task.archivedAt||(!task.scheduledTime&&!task.calendarAllDay)))await TaskCalendar.removeTask({taskId:task.id})
-    const events=tasks.flatMap(task=>buildCalendarEvents(task,latest.records))
-    if(events.length)report.synced=(await TaskCalendar.syncAll({tasks:events})).synced
+    const planned=tasks.filter(task=>!task.archivedAt&&(task.scheduledTime||task.calendarAllDay))
+    if(planned.length) {
+      const now=new Date()
+      const events=planned.flatMap(task=>buildCalendarEvents(task,latest.records,now))
+      const result=await TaskCalendar.syncAll({tasks:events,plannedTaskIds:planned.map(task=>task.id),fromDate:fmtDate(now)})
+      report.synced=result.synced
+      report.removed+=result.removed
+    }
     return report
   })
 }

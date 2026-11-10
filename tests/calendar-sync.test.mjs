@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 async function fixture(tasks=[]){
  const f={state:{tasks,records:[],initialized:true},savedTasks:tasks,savedRecords:[],permission:'granted',calls:[],deleted:[],changes:[],newEvents:[],removed:0};globalThis.calendarSyncTest=f;
  f.state.reload=()=>{f.state.tasks=f.savedTasks;f.state.records=f.savedRecords};
- f.native={checkPermissions:async()=>({calendar:f.permission}),reconcile:async options=>{f.calls.push(['reconcile',options]);if(f.nativeFailure)throw Error('provider unavailable');return {removed:f.removed,deletedKeys:f.deleted,changes:f.changes,newEvents:f.newEvents}},rebind:async options=>{f.calls.push(['rebind',options])},syncAll:async options=>{f.calls.push(['upsert',options]);return {synced:options.tasks.length}},removeTask:async options=>{f.calls.push(['remove',options]);return {removed:1}}};
+ f.native={checkPermissions:async()=>({calendar:f.permission}),reconcile:async options=>{f.calls.push(['reconcile',options]);if(f.nativeFailure)throw Error('provider unavailable');return {removed:f.removed,deletedKeys:f.deleted,changes:f.changes,newEvents:f.newEvents}},rebind:async options=>{f.calls.push(['rebind',options])},syncAll:async options=>{f.calls.push(['upsert',options]);return {synced:options.tasks.length,removed:f.pruned||0}},removeTask:async options=>{f.calls.push(['remove',options]);return {removed:1}}};
  const modules={
   '@capacitor/core':`export const Capacitor={getPlatform:()=> 'android'};export const registerPlugin=()=>Object.fromEntries(['checkPermissions','reconcile','rebind','syncAll','removeTask'].map(key=>[key,(...args)=>globalThis.calendarSyncTest.native[key](...args)]));`,
   '@/services/storage':`export const storage={setTasks:tasks=>globalThis.calendarSyncTest.savedTasks=tasks,setRecords:records=>globalThis.calendarSyncTest.savedRecords=records};`,
@@ -43,4 +43,26 @@ test('new selected-calendar events are saved before writing back and replay neve
  await s.syncCalendarWithCleanup();assert.equal(f.state.tasks.length,1);
  f.newEvents=[];f.changes=[{...f.state.tasks[0],key:'sys-test-100@2026-11-02',eventId:100,title:'在日历中改名',startMillis:new Date('2026-11-03T16:00:00').getTime(),endMillis:new Date('2026-11-03T16:30:00').getTime()}];
  await s.syncCalendarWithCleanup();assert.equal(f.state.tasks[0].title,'在日历中改名');assert.equal(f.state.tasks[0].scheduledDate,'2026-11-03');assert.ok(f.calls.some(([name])=>name==='rebind'));
+});
+
+
+test('a daily task edited to weekly sends only new occurrences and scopes cleanup to that task',async()=>{
+ const weekday=(new Date().getDay()+1)%7;
+ const updated=task('habit',{recurrence:'weekly',weekdays:[weekday],scheduledDate:undefined});
+ const {f,service:s}=await fixture([updated,task('other',{recurrence:'daily'})]);
+ await s.syncTaskToCalendar(updated,[]);
+ const [,plan]=f.calls.find(([name])=>name==='upsert');
+ assert.deepEqual(plan.plannedTaskIds,['habit']);
+ assert.match(plan.fromDate,/^\d{4}-\d{2}-\d{2}$/);
+ assert.equal(plan.tasks.length,2);
+ assert.ok(plan.tasks.every(event=>event.taskId.startsWith('habit@')&&new Date(event.startMillis).getDay()===weekday));
+});
+
+test('cleanup still runs if the task has no events in the next fourteen days',async()=>{
+ const updated=task('habit',{recurrence:'weekly',weekdays:[1],scheduledDate:'2099-01-01'});
+ const {f,service:s}=await fixture([updated]);f.pruned=3;
+ const report=await s.syncCalendarWithCleanup();
+ const [,plan]=f.calls.find(([name])=>name==='upsert');
+ assert.deepEqual(plan.tasks,[]);assert.deepEqual(plan.plannedTaskIds,['habit']);
+ assert.equal(report.removed,3);assert.equal(report.synced,0);
 });

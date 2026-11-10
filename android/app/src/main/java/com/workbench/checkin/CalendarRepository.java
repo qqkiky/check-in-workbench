@@ -105,6 +105,21 @@ public final class CalendarRepository {
         }
         return removed;
     }
+    /** Remove obsolete generated occurrences without recording a user deletion. */
+    public int pruneOccurrences(Set<String> taskIds, Set<String> keepKeys, String fromDate) throws Exception {
+        if(taskIds.isEmpty())return 0;
+        Set<Long> owned=ownedCalendarIds();
+        int removed=0;
+        for(String key:context.getSharedPreferences("calendar-events",0).getAll().keySet()){
+            String taskId=parentTaskId(key);
+            if(taskId.equals(key)||taskId.startsWith("sys-")||!taskIds.contains(taskId)||keepKeys.contains(key)||key.substring(taskId.length()+1).compareTo(fromDate)<0
+                ||context.getSharedPreferences("calendar-external",0).getBoolean(key,false))continue;
+            long id=findEventId(key);
+            if(id>0&&owned.contains(eventSnapshot(id).getLong("calendarId")))removed+=deleteEvent(key);
+        }
+        return removed;
+    }
+
     public JSONArray collectDeletions() throws Exception {
         Set<String> keys=new HashSet<>(context.getSharedPreferences("calendar-events",0).getAll().keySet());
         if(ownedCalendarIds().isEmpty())for(String key:keys)if(!context.getSharedPreferences("calendar-external",0).getBoolean(key,false))throw new Exception("期待的专属日历不存在，无法确认日程删除；本机任务保持不变");
