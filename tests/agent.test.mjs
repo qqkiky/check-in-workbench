@@ -244,6 +244,17 @@ test('local habit rescheduling detaches just one occurrence and preserves later 
  assert.equal(habit.recurrence,'daily');assert.deepEqual(habit.excludedDates,[day]);assert.equal(moved.recurrence,'none');assert.equal(moved.scheduledDate,'2026-12-01');assert.equal(moved.scheduledTime,'20:00');
 });
 
+test('changing a daily task to weekly with a start date updates the original task',async()=>{
+ const {fixture:f,service:a}=await load();
+ f.state.tasks=[{id:'habit',title:'每日阅读',recurrence:'daily',scheduledTime:'19:00',categoryId:'study'}];
+ await a.executeWorkbench({action:'update_task',query:'habit',recurrence:'weekly',weekdays:[3],date:'2026-12-02'});
+ assert.equal(f.state.tasks.length,1);
+ const [updated]=f.state.tasks;
+ assert.equal(updated.id,'habit');assert.equal(updated.recurrence,'weekly');
+ assert.deepEqual(updated.weekdays,[3]);assert.equal(updated.scheduledDate,'2026-12-02');
+ assert.equal(updated.scheduledTime,'19:00');assert.equal(f.calendar,1);
+});
+
 test('current snapshot overrides historical time edits without inventing duplicates and includes real recurring weekdays',async()=>{
  const {fixture:f,service:a}=await load(),original=globalThis.fetch;
  f.state.tasks=[{id:'stretch',title:'拉伸运动',recurrence:'weekly',weekdays:[2,4,6],scheduledTime:'20:00',categoryId:'life',description:'PRIVATE_NOTE',createdAt:Date.now()}];

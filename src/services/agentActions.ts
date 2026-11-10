@@ -153,7 +153,9 @@ export async function executeWorkbench(raw: AgentArgs, approval?: PendingAgentAc
       if(category)draft.task.categoryId=category.id
       return {text:label,modelStatus:'事项已整理，等待用户选择分类并保存，尚未写入',draft}
     }
-    if(current&&current.recurrence!=='none'&&args.date&&args.date!==(args.targetDate||today)) {
+    const changesCycle=(args.recurrence!==undefined&&args.recurrence!==current.recurrence)
+      ||args.weekdays!==undefined||args.monthDay!==undefined
+    if(!changesCycle&&current.recurrence!=='none'&&args.date&&args.date!==(args.targetDate||today)) {
       const day=args.targetDate||today
       if(!taskOccursOnDate(current,new Date(day+'T00:00:00')))throw new Error('原日期没有这项习惯，请明确要移动哪一天')
       if(s.records.some(record=>record.taskId===current.id&&record.date===day))throw new Error('这一次已经完成，请明确要移动哪一天的未完成习惯')
