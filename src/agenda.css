@@ -23,6 +23,8 @@
 .agenda-task-title { display:block; font-size:15px; line-height:1.45; color:#172033; font-weight:600; overflow-wrap:anywhere; }
 .agenda-task-meta { display:block; font-size:11px; color:#748095; line-height:1.5; margin-top:3px; }
 .agenda-badge { font-size:10px; color:#C7433F; background:#FFF0EE; border-radius:6px; padding:3px 5px; flex-shrink:0; }
+.agenda-skip { color:#4b5870; font-size:12px; white-space:nowrap; min-width:40px; min-height:42px; flex-shrink:0; border-radius:8px; }
+.agenda-skip:active { background:#d9e2f380; }
 .agenda-check { width:40px; height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:white; position:relative; }
 .agenda-check::before { content:''; border:1.5px solid #94A0B3; border-radius:50%; width:25px; height:25px; position:absolute; }
 .agenda-check.checked::before { border-color:#2AA768; background:#2AA768; }

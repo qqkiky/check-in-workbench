@@ -13,6 +13,7 @@ interface TaskCardProps {
   task: Task & { completed: boolean; record?: CheckInRecord }
   category?: { name: string; emoji: string; color: string }
   onCheckIn: () => void
+  onSkip?: () => void
   onDetail: () => void
   onArchive?: () => void
   onRestore?: () => void
@@ -71,7 +72,7 @@ function ArchiveAction({ onArchive, onRestore }: { onArchive?: () => void; onRes
   return null
 }
 
-export function TaskCard({ task, category, onCheckIn, onDetail, onArchive, onRestore, compact, taskDate }: TaskCardProps) {
+export function TaskCard({ task, category, onCheckIn, onSkip, onDetail, onArchive, onRestore, compact, taskDate }: TaskCardProps) {
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000)
@@ -194,6 +195,7 @@ export function TaskCard({ task, category, onCheckIn, onDetail, onArchive, onRes
           </div>
         </div>
         <div className="flex flex-col items-center gap-2">
+          {onSkip && <button type="button" className="agenda-skip" onClick={onSkip} aria-label={`跳过本次：${task.title}`}>跳过</button>}
           <ArchiveAction onArchive={onArchive} onRestore={onRestore} />
           <button
             onClick={(e) => {

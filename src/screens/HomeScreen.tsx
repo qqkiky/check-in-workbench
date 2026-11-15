@@ -4,7 +4,7 @@ import { useStore } from '@/store'
 import { TaskCard } from '@/components/tasks/TaskCard'
 import { Icons } from '@/components/common/Icons'
 import { dt, fmtDate, getLunarDay } from '@/utils/date'
-import { showToast } from '@/components/common/Toast'
+import { showActionToast, showToast } from '@/components/common/Toast'
 import { Modal } from '@/components/common/Modal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 import { CheckInTimeModal, shiftMinutes } from '@/components/tasks/CheckInTimeModal'
@@ -149,6 +149,26 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
     () => tasks.filter((t) => t.isQuick && !t.archivedAt),
     [tasks]
   )
+
+  const handleSkip = (taskId: string, dateKey: string) => {
+    const state = useStore.getState()
+    const task = state.tasks.find(item => item.id === taskId)
+    if (!task || task.recurrence === 'none' || dateKey < fmtDate(new Date())) return
+    if (!taskOccursOnDate(task, new Date(dateKey + 'T00:00:00'))) return
+    if (state.records.some(record => record.taskId === taskId && record.date === dateKey)) return
+
+    state.updateTask(taskId, { excludedDates: [...(task.excludedDates || []), dateKey].sort() })
+    showActionToast({
+      message: `已跳过 ${dateKey.slice(5)} 的「${task.title}」`,
+      actionText: '撤销',
+      onAction: () => {
+        const current = useStore.getState()
+        const latest = current.tasks.find(item => item.id === taskId)
+        if (!latest?.excludedDates?.includes(dateKey)) return
+        current.updateTask(taskId, { excludedDates: latest.excludedDates.filter(day => day !== dateKey) })
+      },
+    })
+  }
 
   // done=true 表示当前已打卡（用于取消）；dateKey 为该任务实例所属的那一天
   const handleCheckIn = (taskId: string, done: boolean, dateKey: string) => {
@@ -295,7 +315,7 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
       </header>
       <div className="agenda-scroll flex-1 overflow-y-auto">
         {viewMode === 'today' && <>
-          <TodayAgenda agenda={agenda} categories={categories} compact={compact} onCheckIn={handleCheckIn} onEdit={id => {setEditingTaskId(id);setShowForm(true)}} onAdd={openAdd}/>
+          <TodayAgenda agenda={agenda} categories={categories} compact={compact} onCheckIn={handleCheckIn} onSkip={viewDateKey >= fmtDate(today) ? handleSkip : undefined} onEdit={id => {setEditingTaskId(id);setShowForm(true)}} onAdd={openAdd}/>
           <div className="agenda-timeline">
             <button className="text-sm text-gray-500 py-3" aria-expanded={showTimeline} onClick={() => toggleTimeline(!showTimeline)}>{showTimeline ? '收起时间线' : '查看时间线'}</button>
             {showTimeline && <TodayTimeline records={records} entries={timelineEntries} categories={categories} dateKey={timelineDate} title="时间线" onAddNote={openAddNote} onDeleteEntry={deleteTimelineEntry} onEditEntry={openEditNote} onPrevDay={timelinePrevDay} onNextDay={timelineNextDay} onPickDate={timelinePickDate}/>}
@@ -312,6 +332,7 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
             grouped={weekGrouped}
             categories={categories}
             onCheckIn={handleCheckIn}
+            onSkip={handleSkip}
             onArchive={(id) => {
               archiveTask(id)
               showToast('已归档')
@@ -476,6 +497,7 @@ function WeekView({
   grouped,
   categories,
   onCheckIn,
+  onSkip,
   onArchive,
   onEdit,
   onAdd,
@@ -489,6 +511,7 @@ function WeekView({
   grouped: Record<string, Array<Task & { completed: boolean }>>
   categories: Category[]
   onCheckIn: (id: string, done: boolean, dateKey: string) => void
+  onSkip: (id: string, dateKey: string) => void
   onArchive: (id: string) => void
   onEdit: (id: string) => void
   onAdd: () => void
@@ -602,6 +625,9 @@ function WeekView({
                         taskDate={k}
                         compact
                         onCheckIn={() => onCheckIn(task.id, task.completed, k)}
+                        onSkip={!isPast && !task.completed && task.recurrence !== 'none' && taskOccursOnDate(task, d)
+                          ? () => onSkip(task.id, k)
+                          : undefined}
                         onArchive={() => onArchive(task.id)}
                         onDetail={() => onEdit(task.id)}
                       />

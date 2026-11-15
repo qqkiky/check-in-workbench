@@ -5,9 +5,9 @@ import { recurrenceShortLabel } from '@/utils/recurrence'
 import { Icons } from '@/components/common/Icons'
 import { fmtDate } from '@/utils/date'
 
-export function TodayAgenda({agenda,categories,compact,onCheckIn,onEdit,onAdd}:{
+export function TodayAgenda({agenda,categories,compact,onCheckIn,onSkip,onEdit,onAdd}:{
   agenda:ReturnType<typeof import('@/services/todayAgenda').buildTodayAgenda>;categories:Category[];compact:boolean
-  onCheckIn:(id:string,done:boolean,dateKey:string)=>void;onEdit:(id:string)=>void;onAdd:()=>void
+  onCheckIn:(id:string,done:boolean,dateKey:string)=>void;onSkip?:(id:string,dateKey:string)=>void;onEdit:(id:string)=>void;onAdd:()=>void
 }) {
   const [showDone,setShowDone]=useState(false)
   function row(item:AgendaItem,next=false) {
@@ -24,6 +24,9 @@ export function TodayAgenda({agenda,categories,compact,onCheckIn,onEdit,onAdd}:{
         {overdue&&!compact&&<span className="agenda-badge">逾期</span>}
         {task.priority==='high'&&!overdue&&<span className="text-xs text-orange-600 shrink-0">重要</span>}
       </button>
+      {!record && recurrence && !task.isQuick && onSkip && (
+        <button type="button" className="agenda-skip" aria-label={`跳过本次：${task.title}`} onClick={() => onSkip(task.id,dateKey)}>跳过</button>
+      )}
       <button type="button" className={`agenda-check ${record?'checked':''}`} aria-label={`${record?'取消完成':'标记完成'}：${task.title}`} onClick={()=>onCheckIn(task.id,!!record,dateKey)}>{record&&<Icons.Check size={17}/>}</button>
     </div>
   }
