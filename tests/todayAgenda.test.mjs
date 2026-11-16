@@ -31,3 +31,18 @@ test('completed fold only contains records actually completed on the viewed day'
 test('habit color follows its category and temporary tasks stay white even with a category',()=>{
  assert.equal(habitBackground(task('habit',{recurrence:'daily'}),'#34C759'),'#34C75912');assert.equal(habitBackground(task('single'),'#34C759'),'#FFFFFF');assert.equal(habitBackground(task('habit',{recurrence:'daily'}),'invalid'),'#FFFFFF');
 });
+
+test('overnight completions remain under the previous occurrence for habits and explicit one-off check-ins',()=>{
+ const date='2026-11-05',yesterday=new Date(date+'T00:00:00'),today=new Date('2026-11-06T00:20:00')
+ const habit=task('run',{recurrence:'daily',scheduledTime:'22:00'}),single=task('once',{scheduledDate:date})
+ const carried=task('carry',{scheduledDate:date})
+ const records=[
+  {id:'run-record',taskId:habit.id,taskTitle:'夜间快走',date,completedAt:today.getTime()},
+  {id:'once-record',taskId:single.id,date,completedAt:today.getTime(),keepOccurrenceDate:true},
+  {id:'carry-record',taskId:carried.id,date,completedAt:today.getTime()},
+ ]
+ assert.deepEqual(buildTodayAgenda([habit,single,carried],records,yesterday,today).completed.map(x=>x.record.id),['run-record','once-record'])
+ const agenda=buildTodayAgenda([habit,single,carried],records,today,today)
+ assert.deepEqual(agenda.completed.map(x=>x.record.id),['carry-record'])
+ assert.equal(agenda.pending[0].task.title,'run')
+})

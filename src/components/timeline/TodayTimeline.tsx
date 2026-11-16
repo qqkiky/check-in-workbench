@@ -16,11 +16,14 @@ interface Props {
   onPickDate: (date: string) => void
 }
 
+import { checkInClock } from '@/utils/checkIn'
+
 type Item =
   | {
       type: 'checkin'
       id: string
       time: string
+      endTime: string
       color: string
       catName?: string
       catIcon?: string
@@ -72,13 +75,13 @@ export function TodayTimeline({
   const items: Item[] = [
     ...dayRecords.map<Item>((r) => {
       const cat = catOf(r.categoryId)
-      const startT = r.startedAt
-        ? dt.format(new Date(r.startedAt), 'HH:mm')
-        : dt.format(new Date(r.completedAt), 'HH:mm')
+      const startT = checkInClock(r.startedAt ?? r.completedAt,dateKey)
+      const endT = checkInClock(r.completedAt,dateKey)
       return {
         type: 'checkin',
         id: r.id,
         time: startT,
+        endTime: endT,
         color: cat?.color || '#34C759',
         catName: cat?.name,
         title: r.taskTitle,
@@ -101,7 +104,7 @@ export function TodayTimeline({
   ].sort((a, b) => {
     const ta = a.type === 'checkin' ? a.time : a.startTime
     const tb = b.type === 'checkin' ? b.time : b.startTime
-    return ta.localeCompare(tb)
+    return Number(ta.endsWith('⁺')) - Number(tb.endsWith('⁺')) || ta.localeCompare(tb)
   })
 
   const totalSeconds = dayRecords.reduce((s, r) => s + (r.durationSeconds || 0), 0)
@@ -185,7 +188,7 @@ export function TodayTimeline({
                     <span className="text-[13px] font-semibold text-gray-700">
                       {it.type === 'note'
                         ? `${it.startTime}${it.endTime ? ` – ${it.endTime}` : ''}`
-                        : it.time}
+                        : it.endTime.endsWith('⁺') && it.time !== it.endTime ? `${it.time} – ${it.endTime}` : it.time}
                     </span>
                     <div className="flex items-center gap-2">
                       {it.type === 'checkin' && (it as any).dur > 0 && (

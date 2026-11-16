@@ -1,10 +1,10 @@
 import type { CheckInRecord, Category, TimelineEntry } from '@/types'
-import { dt } from '@/utils/date'
+import { checkInClock } from './checkIn'
 
 export interface DayTimelineItem {
   type: 'checkin' | 'note'
   id: string
-  time: string // 展示用开始时间 HH:mm
+  time: string // 展示用开始时间 HH:mm，次日带 ⁺
   endTime?: string
   color: string
   catName?: string
@@ -56,8 +56,8 @@ export function buildDayTimeline(
     ...dayRecords.map<DayTimelineItem>((r) => {
       const cat = catOf(r.categoryId)
       const seconds = Math.max(0, Number(r.durationSeconds) || 0)
-      const startT = dt.format(new Date(r.startedAt ?? (r.completedAt - seconds * 1000)), 'HH:mm')
-      const endT = dt.format(new Date(r.completedAt), 'HH:mm')
+      const startT = checkInClock(r.startedAt ?? (r.completedAt - seconds * 1000),dateKey)
+      const endT = checkInClock(r.completedAt,dateKey)
       return {
         type: 'checkin',
         id: r.id,
@@ -83,7 +83,7 @@ export function buildDayTimeline(
         dur: timelineDurationSeconds(e.startTime, e.endTime),
       }
     }),
-  ].sort((a, b) => a.time.localeCompare(b.time))
+  ].sort((a, b) => Number(a.time.endsWith('⁺')) - Number(b.time.endsWith('⁺')) || a.time.localeCompare(b.time))
 
   return items
 }

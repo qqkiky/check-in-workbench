@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { showToast } from '@/components/common/Toast'
-import { fmtDate } from '@/utils/date'
+import { dt, fmtDate } from '@/utils/date'
+import { checkInClock, checkInTimes } from '@/utils/checkIn'
+import { TextInput } from '@/components/common/TextField'
 
 interface Props {
   open: boolean
   taskTitle: string
+  occurrenceDate: string
+  canRename: boolean
   defaultDate: string
   defaultStart: string
   defaultEnd: string
   onClose: () => void
-  onConfirm: (start: string, end: string, date: string) => void
+  onConfirm: (start: string, end: string, date: string, title: string) => void
 }
 
 // 在 HH:mm 基础上加 n 分钟（用于补卡默认结束时间预填）
@@ -27,46 +31,44 @@ function shiftMinutes(hm: string, add: number): string {
 export function CheckInTimeModal({
   open,
   taskTitle,
+  occurrenceDate,
+  canRename,
   defaultDate,
   defaultStart,
   defaultEnd,
   onClose,
   onConfirm,
 }: Props) {
+  const [title, setTitle] = useState(taskTitle)
   const [date, setDate] = useState(defaultDate)
   const [start, setStart] = useState(defaultStart)
   const [end, setEnd] = useState(defaultEnd)
 
   useEffect(() => {
     if (open) {
+      setTitle(taskTitle)
       setDate(defaultDate)
       setStart(defaultStart)
       setEnd(defaultEnd)
     }
-  }, [open, defaultDate, defaultStart, defaultEnd])
+  }, [open, taskTitle, defaultDate, defaultStart, defaultEnd])
 
-  // 所选日期早于今天 → 视为补卡
-  const isMakeup = date < fmtDate(new Date())
-  // 日期晚于今天（手动选了未来）→ 给出提示但不阻止
-  const isFuture = date > fmtDate(new Date())
-
-  const startMin = (() => {
-    const [h, m] = start.split(':').map(Number)
-    return h * 60 + m
-  })()
-  const endMin = (() => {
-    const [h, m] = end.split(':').map(Number)
-    return h * 60 + m
-  })()
-  const crossDay = endMin - startMin < 0
-  const durMin = crossDay ? endMin - startMin + 24 * 60 : endMin - startMin
+  const isMakeup = occurrenceDate < fmtDate(new Date())
+  const times = date && start && end ? checkInTimes(date,start,end) : null
+  const durMin = times ? Math.floor(times.durationSeconds / 60) : 0
+  const startClock = times ? checkInClock(times.startedAt,occurrenceDate) : ''
+  const endClock = times ? checkInClock(times.completedAt,occurrenceDate) : ''
 
   const handleConfirm = () => {
-    if (!date) {
-      showToast('请选择日期')
+    if (!times) {
+      showToast('请选择日期和起止时间')
       return
     }
-    onConfirm(start, end, date)
+    if (!title.trim()) {
+      showToast('请输入本次记录名称')
+      return
+    }
+    onConfirm(start,end,date,title.trim())
   }
 
   const fmtDur = (min: number) => {
@@ -81,7 +83,7 @@ export function CheckInTimeModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isMakeup ? '补卡' : '记录打卡时间'}
+      title={`${taskTitle} · ${isMakeup ? '补卡' : '打卡'}`}
       footer={
         <div className="flex gap-2">
           <button
@@ -100,10 +102,18 @@ export function CheckInTimeModal({
       }
     >
       <div className="space-y-4">
-        <div className="text-sm text-gray-700 font-medium truncate">{taskTitle}</div>
+        <p className="text-sm text-primary font-medium">任务归属 {dt.format(occurrenceDate, 'MM月dd日')} {dt.format(occurrenceDate, 'EEEE')}</p>
+        {canRename && <div>
+          <label className="block">
+            <span className="text-xs text-gray-500">本次记录名称</span>
+            <TextInput value={title} onChange={e => setTitle(e.target.value)}
+              className="mt-1 w-full px-4 py-2.5 rounded-xl bg-gray-50 text-base focus:ring-2 focus:ring-primary/30"/>
+          </label>
+          <p className="mt-1 text-xs text-gray-500">习惯名称 {taskTitle}</p>
+        </div>}
 
         <label className="block">
-          <span className="text-xs text-gray-500">完成日期</span>
+          <span className="text-xs text-gray-500">实际开始日期</span>
           <input
             type="date"
             value={date}
@@ -112,15 +122,6 @@ export function CheckInTimeModal({
             className="mt-1 w-full px-4 py-2.5 rounded-xl bg-gray-50 text-base outline-none focus:ring-2 focus:ring-primary/30"
           />
         </label>
-
-        {isMakeup && (
-          <div className="text-[11px] text-orange-500">
-            实际完成日期为 {date}；这条待办所属的日期保持不变。
-          </div>
-        )}
-        {isFuture && (
-          <div className="text-[11px] text-gray-400">已选择未来日期，将记为该日打卡。</div>
-        )}
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
@@ -151,9 +152,8 @@ export function CheckInTimeModal({
             durMin > 0 ? 'bg-primary/10 text-primary' : 'bg-gray-50 text-gray-400'
           }`}
         >
-          {durMin > 0
-            ? `本次时长：${fmtDur(durMin)}${crossDay ? '（跨天 · 次日结束）' : ''}`
-            : '同一分钟内完成打卡（时长为 0）'}
+          {times && <div>{startClock === endClock ? endClock : `${startClock} – ${endClock}`} · {fmtDur(durMin)}</div>}
+          {endClock.endsWith('⁺') && <div className="mt-1 text-xs font-normal">⁺ 表示次日</div>}
         </div>
       </div>
     </Modal>

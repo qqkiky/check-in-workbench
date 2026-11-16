@@ -71,8 +71,9 @@ export function minuteClock(value:number){
   return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')
 }
 export function timelineSpan(item:DayTimelineItem){
-  const start=clockMinute(item.time)
-  const rawEnd=item.endTime?clockMinute(item.endTime):start+Math.floor(item.dur/60)
+  const minute=(time:string)=>clockMinute(time.replace(/⁺$/,''))+(time.endsWith('⁺')?1440:0)
+  const start=minute(item.time)
+  const rawEnd=item.endTime?minute(item.endTime):start+Math.floor(item.dur/60)
   const end=rawEnd<start?rawEnd+1440:rawEnd
   return {start,end,point:end===start}
 }

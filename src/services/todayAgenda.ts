@@ -1,5 +1,6 @@
 import type { Task, CheckInRecord } from '@/types'
 import { fmtDate } from '@/utils/date'
+import { isNextDay } from '@/utils/checkIn'
 import { taskOccursOnDate } from '@/utils/recurrence'
 
 export interface AgendaItem { task:Task; dateKey:string; record?:CheckInRecord; overdue:boolean }
@@ -15,9 +16,12 @@ export function buildTodayAgenda(tasks:Task[],records:CheckInRecord[],viewDate:D
     const due=task.scheduledDate
     const scheduled=task.isQuick?!due||due===day:taskOccursOnDate(task,viewDate)
     const carry=isToday&&single&&!record&&!!due&&due<day
-    const completedOnDay=single&&record&&fmtDate(new Date(record.completedAt))===day
-    if(!scheduled&&!carry&&!completedOnDay)continue
-    if(record&&fmtDate(new Date(record.completedAt))!==day)continue
+    const displayDay=record && (
+      record.keepOccurrenceDate || (!single && isNextDay(new Date(record.completedAt),record.date))
+        ? record.date
+        : fmtDate(record.completedAt)
+    )
+    if(record ? displayDay!==day : !scheduled&&!carry)continue
     if(task.isQuick&&!due&&!isToday&&fmtDate(new Date(task.createdAt))>day)continue
     const dateKey=record?.date||(single&&due?due:day)
     const overdue=!record&&!!task.scheduledTime&&new Date(`${dateKey}T${task.scheduledTime}:00`).getTime()<now.getTime()

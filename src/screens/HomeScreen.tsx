@@ -1,7 +1,6 @@
 import { TextInput } from '@/components/common/TextField'
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@/store'
-import { TaskCard } from '@/components/tasks/TaskCard'
 import { Icons } from '@/components/common/Icons'
 import { dt, fmtDate, getLunarDay } from '@/utils/date'
 import { showActionToast, showToast } from '@/components/common/Toast'
@@ -17,6 +16,7 @@ import { APP_VERSION } from '@/version'
 import { TodayAgenda } from '@/components/tasks/TodayAgenda'
 import { buildTodayAgenda } from '@/services/todayAgenda'
 import { taskOccursOnDate } from '@/utils/recurrence'
+import { checkInTimes, isNextDay } from '@/utils/checkIn'
 
 type DayTab = 'today' | 'week' | 'quick'
 
@@ -50,7 +50,7 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
   const [pendingCheckIn, setPendingCheckIn] = useState<{
     taskId: string
     dateKey: string
-    completedDate: string
+    startDate: string
     defaultStart: string
     defaultEnd: string
   } | null>(null)
@@ -128,16 +128,16 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
   }, [tasks, weekDates, weekDateKeys, today])
 
   const weekGrouped = useMemo(() => {
-    const groups: Record<string, Array<Task & { completed: boolean; record?: CheckInRecord }>> = {}
+    const groups: Record<string, Array<{ task: Task; record?: CheckInRecord }>> = {}
     for (const d of weekDateKeys) groups[d] = []
     for (const { task, dateKey } of weekTaskInstances) {
       if (groups[dateKey]) {
         const rec = records.find((r) => r.taskId === task.id && r.date === dateKey)
-        // 关键：必须带上 record，否则 TaskCard 的「已完成」分支
-        // （ if (task.completed && task.record) ）会因 record 缺失而跳过，
-        // 导致周视图里打卡过的任务仍显示为「未完成」。日/周同步依赖这一点。
-        groups[dateKey].push({ ...task, completed: !!rec, record: rec })
+        groups[dateKey].push({ task, record: rec })
       }
+    }
+    for (const items of Object.values(groups)) {
+      items.sort((a,b) => (a.task.scheduledTime || '99:99').localeCompare(b.task.scheduledTime || '99:99'))
     }
     return groups
   }, [weekTaskInstances, weekDateKeys, records])
@@ -191,43 +191,38 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
     // 普通任务：弹出时间选择，录入「日期 + 起止时间」用于「今日时间线」计算时长
     const now = new Date()
     const nowHHmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    const completedDate = viewMode === 'today' && viewDateKey === fmtDate(today) && task.recurrence === 'none' && dateKey < viewDateKey ? viewDateKey : dateKey
-    const isPast = completedDate < fmtDate(today)
-    // 补卡（过去日）：默认用计划时间预填合理时段；当天打卡默认用当前时间
-    const defaultStart = task.scheduledTime || (isPast ? '09:00' : nowHHmm)
-    const defaultEnd = isPast
-      ? task.scheduledTime
-        ? shiftMinutes(task.scheduledTime, 30)
-        : '09:30'
+    const todayKey = fmtDate(now)
+    const isCarry = viewMode === 'today' && viewDateKey === todayKey && task.recurrence === 'none' && dateKey < todayKey
+    const overnight = now.getHours() < 6 && isNextDay(now,dateKey)
+    const hadEveningPlan = overnight && !!task.scheduledTime && task.scheduledTime >= '18:00'
+    const startDate = hadEveningPlan ? dateKey : isCarry || overnight ? todayKey : dateKey
+    const usePlannedTimes = startDate !== todayKey && !overnight
+    const plannedStart = task.scheduledTime || '09:00'
+    const defaultStart = usePlannedTimes || hadEveningPlan || (plannedStart <= nowHHmm && task.scheduledTime)
+      ? plannedStart
       : nowHHmm
-    setPendingCheckIn({ taskId, dateKey, completedDate, defaultStart, defaultEnd })
+    const defaultEnd = usePlannedTimes ? shiftMinutes(defaultStart,30) : nowHHmm
+    setPendingCheckIn({ taskId, dateKey, startDate, defaultStart, defaultEnd })
   }
 
-  // 写入一条打卡记录；start/end 为 HH:mm（小事为 null → 仅记录完成时间，时长为 0）
-  const doCheckIn = (task: Task, dateKey: string, start: string | null, end: string | null, completedDate = dateKey) => {
-    let startedAt: number | undefined
-    let completedAt = Date.now()
-    let durationSeconds = 0
-    if (start && end) {
-      const [sh, sm] = start.split(':').map(Number)
-      const [eh, em] = end.split(':').map(Number)
-      const [Y, M, D] = completedDate.split('-').map(Number)
-      startedAt = new Date(Y, M - 1, D, sh, sm, 0, 0).getTime()
-      completedAt = new Date(Y, M - 1, D, eh, em, 0, 0).getTime()
-      if (completedAt < startedAt) {
-        // 跨天：结束时间视为次日（若开始=结束，则同一分钟内完成，时长为 0）
-        completedAt += 24 * 60 * 60 * 1000
-      }
-      durationSeconds = Math.max(0, Math.round((completedAt - startedAt) / 1000))
-    }
+  const doCheckIn = (task: Task, dateKey: string, start: string | null, end: string | null, startDate = dateKey, title = task.title) => {
+    const { startedAt, completedAt, durationSeconds } = start && end
+      ? checkInTimes(startDate,start,end)
+      : { startedAt:undefined, completedAt:Date.now(), durationSeconds:0 }
+    const now = new Date()
+    const isCarry = viewMode === 'today' && viewDateKey === fmtDate(now) && task.recurrence === 'none' && dateKey < viewDateKey
+    const keepOccurrenceDate = isNextDay(new Date(completedAt),dateKey) && (
+      !isCarry || startDate === dateKey || now.getHours() < 6
+    )
     addRecord({
       taskId: task.id,
-      taskTitle: task.title,
+      taskTitle: title,
       categoryId: task.categoryId,
       date: dateKey,
       startedAt,
       completedAt,
       durationSeconds,
+      ...(keepOccurrenceDate ? { keepOccurrenceDate } : {}),
       progress: task.target ? Math.min(task.target, 1) : undefined,
       progressTotal: task.target,
       isMakeup: dateKey < fmtDate(today),
@@ -236,12 +231,11 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
     showToast('✓ 已打卡')
   }
 
-  // 时间选择弹窗确认（date 为用户所选完成日期，补卡时可不同于计划日）
-  const confirmCheckIn = (start: string, end: string, date: string) => {
+  const confirmCheckIn = (start: string, end: string, startDate: string, title: string) => {
     if (!pendingCheckIn) return
     const task = tasks.find((t) => t.id === pendingCheckIn.taskId)
     setPendingCheckIn(null)
-    if (task) doCheckIn(task, pendingCheckIn.dateKey, start, end, date)
+    if (task) doCheckIn(task, pendingCheckIn.dateKey, start, end, startDate, title)
   }
 
   const addQuick = () => {
@@ -299,17 +293,17 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
       <header className="agenda-header">
         <button className="agenda-brand" onClick={() => setShowEvents(true)} aria-label="查看即将到来的节气与节日">{APP_NAME}</button>
         <div className="agenda-title-row">
-          <h1>{viewMode === 'quick' ? '小事' : viewMode === 'week' ? (isCurrentWeek ? '本周' : '所选周') : viewDateKey === fmtDate(today) ? '今天' : dt.format(viewDate, 'MM月dd日')}<span className="agenda-cover-date"> · {dt.format(viewDate, 'MM/dd')}</span></h1>
+          <h1>{viewMode === 'quick' ? '小事' : viewMode === 'week' ? (isCurrentWeek ? '本周规划' : '周规划') : viewDateKey === fmtDate(today) ? '今天' : dt.format(viewDate, 'MM月dd日')}{viewMode !== 'week' && <span className="agenda-cover-date"> · {dt.format(viewDate, 'MM/dd')}</span>}</h1>
           <div className="flex items-center gap-1">
             <button className="agenda-header-action" onClick={() => setShowDatePicker(true)} aria-label="切换日期与视图"><Icons.Calendar size={20}/></button>
             <button className="agenda-header-action text-primary" onClick={openAdd} aria-label="新增任务">＋</button>
           </div>
         </div>
-        <div className="agenda-date-browse">
+        <div className={`agenda-date-browse ${viewMode === 'week' ? 'agenda-week-dates' : ''}`}>
           <button onClick={() => shiftViewDate(viewMode === 'week' ? -7 : -1)} aria-label={viewMode === 'week' ? '上一周' : '上一天'}><Icons.ChevronLeft size={16}/></button>
           <button className="agenda-date-label" onClick={() => setShowDatePicker(true)}>{viewMode === 'week' ? `${dt.format(weekStart, 'MM/dd')} – ${dt.format(weekDates[6], 'MM/dd')}` : `${dt.format(viewDate, 'MM月dd日')} ${dt.format(viewDate, 'EEEE')}`}</button>
           <button onClick={() => shiftViewDate(viewMode === 'week' ? 7 : 1)} aria-label={viewMode === 'week' ? '下一周' : '下一天'}><Icons.ChevronRight size={16}/></button>
-          {viewDateKey !== fmtDate(today) && <button className="ml-auto text-primary" onClick={() => setFocusDate(null)}>今天</button>}
+          {viewMode !== 'week' && viewDateKey !== fmtDate(today) && <button className="ml-auto text-primary" onClick={() => setFocusDate(null)}>今天</button>}
           <button className="ml-auto text-primary" onClick={() => setShowDatePicker(true)}>{viewMode === 'week' ? '周视图' : viewMode === 'quick' ? '小事' : '日视图'}</button>
         </div>
       </header>
@@ -324,24 +318,17 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
 
         {viewMode === 'week' && (
           <WeekView
-            weekStart={weekStart}
             weekDates={weekDates}
-            weekDateKeys={weekDateKeys}
             today={today}
             isCurrentWeek={isCurrentWeek}
             grouped={weekGrouped}
             categories={categories}
             onCheckIn={handleCheckIn}
             onSkip={handleSkip}
-            onArchive={(id) => {
-              archiveTask(id)
-              showToast('已归档')
-            }}
             onEdit={(id) => {
               setEditingTaskId(id)
               setShowForm(true)
             }}
-            onAdd={openAdd}
             onPickDate={handlePickDate}
           />
         )}
@@ -412,6 +399,12 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
         open={showForm}
         taskId={editingTaskId}
         defaultScheduledDate={defaultScheduledDate}
+        onArchive={viewMode === 'week' ? id => {
+          archiveTask(id)
+          setShowForm(false)
+          setEditingTaskId(null)
+          showToast('已归档')
+        } : undefined}
         onClose={() => {
           setShowForm(false)
           setEditingTaskId(null)
@@ -423,7 +416,9 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
       <CheckInTimeModal
         open={!!pendingCheckIn}
         taskTitle={pendingCheckIn ? (tasks.find((t) => t.id === pendingCheckIn.taskId)?.title ?? '') : ''}
-        defaultDate={pendingCheckIn?.completedDate || fmtDate(today)}
+        occurrenceDate={pendingCheckIn?.dateKey || fmtDate(today)}
+        defaultDate={pendingCheckIn?.startDate || fmtDate(today)}
+        canRename={tasks.some(task => task.id === pendingCheckIn?.taskId && task.recurrence !== 'none')}
         defaultStart={pendingCheckIn?.defaultStart || '09:00'}
         defaultEnd={pendingCheckIn?.defaultEnd || '09:30'}
         onClose={() => setPendingCheckIn(null)}
@@ -487,174 +482,64 @@ export function HomeScreen({compact=false,onOpenAgent}:{compact?:boolean;onOpenA
   )
 }
 
-// ============== 周视图组件 ==============
 function WeekView({
-  weekStart,
-  weekDates,
-  weekDateKeys,
-  today,
-  isCurrentWeek,
-  grouped,
-  categories,
-  onCheckIn,
-  onSkip,
-  onArchive,
-  onEdit,
-  onAdd,
-  onPickDate,
+  weekDates, today, isCurrentWeek, grouped, categories, onCheckIn, onSkip, onEdit, onPickDate,
 }: {
-  weekStart: Date
   weekDates: Date[]
-  weekDateKeys: string[]
   today: Date
   isCurrentWeek: boolean
-  grouped: Record<string, Array<Task & { completed: boolean }>>
+  grouped: Record<string, Array<{ task: Task; record?: CheckInRecord }>>
   categories: Category[]
   onCheckIn: (id: string, done: boolean, dateKey: string) => void
   onSkip: (id: string, dateKey: string) => void
-  onArchive: (id: string) => void
   onEdit: (id: string) => void
-  onAdd: () => void
-  onPickDate?: (dateKey: string) => void
+  onPickDate: (dateKey: string) => void
 }) {
   const todayKey = fmtDate(today)
-  const totalCount = Object.values(grouped).reduce((s, arr) => s + arr.length, 0)
-  const doneCount = weekDateKeys.reduce(
-    (s, k) => s + (grouped[k] || []).filter((t) => t.completed).length,
-    0
-  )
-
-  // 把图2顶部星期表头的数据预计算
-  const weekDayLabels = ['一', '二', '三', '四', '五', '六', '日']
+  const allItems = Object.values(grouped).flat()
+  const doneCount = allItems.filter(item => item.record).length
 
   return (
-    <>
-      {/* 周表头（参考图2）—— 点击某天跳转到那一天 */}
-      <div className="mt-3 bg-white rounded-2xl shadow-card">
-        <div className="grid grid-cols-7 text-center py-2">
-          {weekDates.map((d, i) => {
-            const k = fmtDate(d)
-            const isToday = k === todayKey
-            const isWeekend = i >= 5
-            const items = grouped[k] || []
-            const itemsCount = items.length
-            const isPastDay = d < today && !isToday
-            const doneForDay = items.filter((t) => t.completed).length
-            const makeupCount = isPastDay ? itemsCount - doneForDay : 0
-            return (
-              <button
-                key={k}
-                onClick={() => onPickDate?.(k)}
-                className="flex flex-col items-center active:scale-95 transition"
-                aria-label={`查看 ${dt.format(d, 'MM月dd日')} 的任务`}
-              >
-                <div className={`text-[10px] mb-0.5 ${isToday ? 'text-primary font-semibold' : 'text-gray-500'}`}>
-                  {weekDayLabels[i]}
-                </div>
-                <div
-                  className={`w-7 h-7 rounded-md flex items-center justify-center text-sm font-semibold ${
-                    isToday
-                      ? 'bg-primary text-white'
-                      : isWeekend
-                      ? 'text-red-500'
-                      : 'text-gray-900'
-                  }`}
-                >
-                  {d.getDate()}
-                </div>
-                {isPastDay && makeupCount > 0 ? (
-                  <div className="mt-0.5 text-[9px] font-semibold text-orange-500">补{makeupCount}</div>
-                ) : (
-                  <div className={`mt-0.5 text-[9px] ${itemsCount > 0 ? 'text-primary' : 'text-gray-300'}`}>
-                    {itemsCount > 0 ? itemsCount : '·'}
-                  </div>
-                )}
+    <div className="agenda-week">
+      <div className="agenda-week-summary">
+        <strong>{isCurrentWeek ? '本周' : '所选周'}完成 {doneCount} / {allItems.length}</strong>
+        <progress aria-label="本周进度" value={doneCount} max={allItems.length || 1}/>
+      </div>
+      {weekDates.map(day => {
+        const key = fmtDate(day)
+        const items = grouped[key]
+        const done = items.filter(item => item.record).length
+        return <section key={key} className="agenda-week-day" aria-labelledby={`week-${key}`}>
+          <div className="agenda-week-day-header">
+            <h2 id={`week-${key}`} className={key === todayKey ? 'is-today' : undefined}>
+              <button type="button" onClick={() => onPickDate(key)} aria-label={`查看 ${dt.format(day,'MM月dd日')} 的任务`}>
+                {dt.format(day,'EEEE')} · {day.getMonth()+1}月{day.getDate()}日
               </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* 进度概览 */}
-      <div className="mt-2 px-2 text-[11px] text-gray-500 flex items-center justify-between">
-        <span>{isCurrentWeek ? '本周' : '所选周'} {doneCount}/{totalCount} 已完成</span>
-        <button
-          onClick={onAdd}
-          className="text-primary active:scale-95"
-          aria-label="新增任务"
-        >
-          + 新增
-        </button>
-      </div>
-
-      {/* 按天分组的任务列表 */}
-      <div className="mt-2 space-y-3">
-        {weekDates.map((d) => {
-          const k = fmtDate(d)
-          const items = grouped[k] || []
-          const isToday = k === todayKey
-          const isPast = d < today && !isToday
-          return (
-            <div key={k} className={`bg-white rounded-2xl shadow-card overflow-hidden ${isToday ? 'ring-1 ring-primary/30' : ''}`}>
-              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-50">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-sm font-semibold ${
-                      isToday ? 'text-primary' : isPast ? 'text-gray-400' : 'text-gray-700'
-                    }`}
-                  >
-                    {isToday ? '今天' : dt.format(d, 'MM/dd')}
-                  </span>
-                  <span className="text-[10px] text-gray-400">{dt.format(d, 'EEEE')}</span>
-                </div>
-                <span className="text-[10px] text-gray-400">
-                  {items.filter((i) => i.completed).length}/{items.length}
-                </span>
-              </div>
-              {items.length === 0 ? (
-                <div className="px-3 py-4 text-[12px] text-gray-300 text-center">无任务</div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {items.map((task) => {
-                    const cat = categories.find((c) => c.id === task.categoryId)
-                    return (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        category={cat}
-                        taskDate={k}
-                        compact
-                        onCheckIn={() => onCheckIn(task.id, task.completed, k)}
-                        onSkip={!isPast && !task.completed && task.recurrence !== 'none' && taskOccursOnDate(task, d)
-                          ? () => onSkip(task.id, k)
-                          : undefined}
-                        onArchive={() => onArchive(task.id)}
-                        onDetail={() => onEdit(task.id)}
-                      />
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {totalCount === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl shadow-card text-gray-400">
-            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3 text-gray-300">
-              <Icons.Calendar size={28} />
-            </div>
-            <p className="text-sm">{isCurrentWeek ? '本周' : '所选周'}还没有任务</p>
-            <button
-              onClick={onAdd}
-              className="mt-3 px-4 py-2 bg-primary text-white rounded-full text-sm font-medium active:scale-95"
-            >
-              添加一个
-            </button>
+            </h2>
+            <span>{done}/{items.length} 已完成</span>
           </div>
-        )}
-      </div>
-    </>
+          <div className="agenda-week-items">
+            {items.length === 0 && <p>当天没有事项</p>}
+            {items.map(({task,record}) => {
+              const title = record?.taskTitle || task.title
+              const color = categories.find(category => category.id === task.categoryId)?.color
+              return <div key={task.id} className="agenda-week-item" data-task-id={task.id} data-occurrence={key}>
+                <button type="button" className="agenda-week-task" onClick={() => onEdit(task.id)} aria-label={`编辑任务：${title}`}>
+                  <span className="agenda-week-time">{task.scheduledTime || (task.calendarAllDay ? '全天' : '待定')}</span>
+                  <span className="agenda-week-dot" style={{backgroundColor:color}} aria-hidden="true"/>
+                  <span className="agenda-task-title">{title}</span>
+                </button>
+                {!record && key >= todayKey && task.recurrence !== 'none' && taskOccursOnDate(task,day) &&
+                  <button type="button" className="agenda-skip" aria-label={`跳过本次：${title}`} onClick={() => onSkip(task.id,key)}>跳过</button>}
+                <button type="button" className={`agenda-check ${record ? 'checked' : ''}`} aria-label={`${record ? '取消完成' : '标记完成'}：${title}`} onClick={() => onCheckIn(task.id,!!record,key)}>
+                  {record && <Icons.Check size={15}/>}
+                </button>
+              </div>
+            })}
+          </div>
+        </section>
+      })}
+    </div>
   )
 }
 

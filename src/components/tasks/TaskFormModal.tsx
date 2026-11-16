@@ -16,6 +16,7 @@ interface TaskFormModalProps {
   taskId?: string | null
   defaultCategoryId?: CategoryId
   defaultScheduledDate?: string // YYYY-MM-DD，从周视图某天点进来时预填
+  onArchive?: (id: string) => void
   onClose: () => void
 }
 
@@ -36,7 +37,7 @@ const RECURRENCE_OPTIONS: { v: Recurrence; l: string }[] = [
   { v: 'monthly', l: '每月' },
 ]
 
-export function TaskFormModal({ open, taskId, defaultCategoryId, defaultScheduledDate, onClose }: TaskFormModalProps) {
+export function TaskFormModal({ open, taskId, defaultCategoryId, defaultScheduledDate, onArchive, onClose }: TaskFormModalProps) {
   const { tasks, categories, addTask, updateTask, deleteTask } = useStore()
   const editing = taskId ? tasks.find((t) => t.id === taskId) : null
 
@@ -154,6 +155,9 @@ export function TaskFormModal({ open, taskId, defaultCategoryId, defaultSchedule
               >
                 删除
               </Button>
+            )}
+            {editing && onArchive && (
+              <Button variant="ghost" onClick={() => onArchive(editing.id)} icon={<Icons.Archive size={16}/>}>归档</Button>
             )}
             <Button fullWidth onClick={handleSave}>
               {editing ? '保存' : '添加'}

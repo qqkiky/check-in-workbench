@@ -79,3 +79,32 @@
 .account-compact .account-summary{--account-summary-base:1rem;gap:4px;padding:8px 10px}
 .account-compact>header>div:last-child{margin-top:8px}
 .account-compact>div.overflow-y-auto{padding-bottom:12px;min-height:0}
+
+.agenda-date-browse.agenda-week-dates { display:flex; }
+.agenda-week-dates .agenda-date-label { order:-1; margin-right:auto; font-weight:600; color:#293448; white-space:nowrap; }
+.agenda-week-dates > button:last-child { margin-left:6px; }
+.agenda-week { display:grid; gap:14px; padding-top:4px; }
+.agenda-week-summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border-radius:12px; background:#EDF1FA; color:rgb(var(--primary-rgb)); font-size:13px; }
+.agenda-week-summary progress { flex:0 1 42%; min-width:0; height:6px; border:0; border-radius:8px; overflow:hidden; appearance:none; background:#DCE5FA; }
+.agenda-week-summary progress::-webkit-progress-bar { background:#DCE5FA; }
+.agenda-week-summary progress::-webkit-progress-value { background:rgb(var(--primary-rgb)); border-radius:8px; }
+.agenda-week-day-header { display:flex; align-items:center; justify-content:space-between; gap:6px; margin:0 2px 4px; }
+.agenda-week-day-header h2 { color:#172033; font-weight:650; font-size:15px; }
+.agenda-week-day-header h2 button { min-height:36px; text-align:left; }
+.agenda-week-day-header .is-today { padding-left:8px; border-left:4px solid rgb(var(--primary-rgb)); color:rgb(var(--primary-rgb)); }
+.agenda-week-day-header > span { color:#66738B; font-size:12px; white-space:nowrap; }
+.agenda-week-items { border:1px solid #E3E8F2; border-radius:12px; background:white; padding:0 7px 0 10px; }
+.agenda-week-items > p { padding:11px 0; color:#66738B; font-size:12px; }
+.agenda-week-item { display:flex; align-items:center; min-width:0; }
+.agenda-week-item + .agenda-week-item { border-top:1px solid #EEF1F6; }
+.agenda-week-task { display:flex; align-items:center; gap:7px; flex:1; min-width:0; min-height:44px; text-align:left; }
+.agenda-week-time { flex:0 0 40px; font-size:12px; color:#66738B; font-variant-numeric:tabular-nums; }
+.agenda-week-dot { flex:0 0 7px; height:7px; border-radius:50%; background:#94A0B3; }
+.agenda-week-item .agenda-task-title { padding:7px 0; font-size:14px; }
+.agenda-week-item .agenda-check::before { width:20px; height:20px; }
+.is-compact .agenda-week { gap:10px; }
+.is-compact .agenda-week-dates .agenda-date-label { min-width:0; }
+.is-compact .agenda-week-dates > button:last-child { display:none; }
+.is-compact .agenda-week-summary { padding:9px; }
+.is-compact .agenda-week-task { gap:5px; }
+.is-compact .agenda-week-time { flex-basis:34px; font-size:11px; }

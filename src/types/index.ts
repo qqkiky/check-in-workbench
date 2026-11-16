@@ -96,6 +96,7 @@ export interface CheckInRecord {
   note?: string
   isMakeup?: boolean   // 是否为补卡（打卡日期早于实际打卡当天）
   makeupAt?: number    // 补卡实际执行时间戳（用于追溯补卡时间）
+  keepOccurrenceDate?: boolean // 次日完成时仍在任务所属日显示
 }
 
 // 应用设置

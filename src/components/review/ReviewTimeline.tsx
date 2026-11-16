@@ -88,7 +88,7 @@ export function DailyTimeline({items,onEdit,onDelete}:{items:DayTimelineItem[];o
           {items.map((it,i)=>{
             const span=timelineSpan(it),y=top(span.start),labelY=labels[i],left=span.point?14:8+18*Math.min(3,lanes[i])
             return <div key={itemKey(it)}>{labelY-y>8&&<i aria-hidden="true" className="rv-timeline-leader" style={{left,top:y,height:labelY-y}}/>}
-              <button type="button" className="rv-timeline-label" style={{top:labelY,left,maxWidth:`calc(100% - ${left+2}px)`}} title={titleOf(it)} onClick={()=>setSelected(itemKey(it))}><span>{titleOf(it)}</span><small>{it.time}{!span.point?'–'+minuteClock(span.end):''}</small></button>
+              <button type="button" className="rv-timeline-label" style={{top:labelY,left,maxWidth:`calc(100% - ${left+2}px)`}} title={titleOf(it)} onClick={()=>setSelected(itemKey(it))}><span>{titleOf(it)}</span><small>{it.time}{!span.point?'–'+minuteClock(span.end)+(span.end>=1440?'⁺':''):''}</small></button>
             </div>
           })}
         </div>

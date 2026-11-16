@@ -2,8 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'esbuild'
 
-const bundle=await build({stdin:{contents:"export * from './src/utils/review.ts';export * from './src/utils/timeline.ts'",resolveDir:process.cwd()},bundle:true,format:'esm',platform:'node',write:false})
-const {buildDayTimeline,timelineSpan,timelineBounds,visibleRailTicks,overlapOffsets,monthlyInvestment,reviewGroups,calendarCounts,monthDays,mondayPadding}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'))
+const bundle=await build({stdin:{contents:"export * from './src/utils/review.ts';export * from './src/utils/timeline.ts';export * from './src/utils/checkIn.ts'",resolveDir:process.cwd()},bundle:true,format:'esm',platform:'node',write:false})
+const {checkInTimes,buildDayTimeline,timelineSpan,timelineBounds,visibleRailTicks,overlapOffsets,monthlyInvestment,reviewGroups,calendarCounts,monthDays,mondayPadding}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'))
 const day='2026-11-05'
 const at=(h,m,s=0)=>new Date(2026,10,5,h,m,s).getTime()
 const record=(id,date=day,categoryId='work',durationSeconds=60)=>({id,taskId:id,taskTitle:id,date,categoryId,completedAt:at(14,0),durationSeconds})
@@ -56,4 +56,17 @@ test('rail keeps the range endpoints and suppresses intermediate labels that col
   return {left:left+shift,right:right+shift}
  })
  assert.deepEqual(visibleRailTicks(wider),[true,true,true,true,true])
+})
+
+test('cross-midnight ranges and next-day points retain their placement and occurrence title',()=>{
+ const late={...record('late'),...checkInTimes(day,'23:55','00:20'),taskTitle:'夜间快走'}
+ const point={...record('point'),...checkInTimes('2026-11-06','00:20','00:20')}
+ const [range,dot]=buildDayTimeline(day,[point,late],[],cats)
+ assert.equal(range.title,'夜间快走')
+ assert.equal(range.dur,1500)
+ assert.equal(range.endTime,'00:20⁺')
+ assert.deepEqual(timelineSpan(range),{start:1435,end:1460,point:false})
+ assert.equal(dot.time,'00:20⁺')
+ assert.deepEqual(timelineSpan(dot),{start:1460,end:1460,point:true})
+ assert.deepEqual(buildDayTimeline('2026-11-06',[point,late],[],cats),[])
 })

@@ -4,6 +4,7 @@ import { type AgendaItem, habitBackground } from '@/services/todayAgenda'
 import { recurrenceShortLabel } from '@/utils/recurrence'
 import { Icons } from '@/components/common/Icons'
 import { fmtDate } from '@/utils/date'
+import { checkInClock } from '@/utils/checkIn'
 
 export function TodayAgenda({agenda,categories,compact,onCheckIn,onSkip,onEdit,onAdd}:{
   agenda:ReturnType<typeof import('@/services/todayAgenda').buildTodayAgenda>;categories:Category[];compact:boolean
@@ -13,21 +14,32 @@ export function TodayAgenda({agenda,categories,compact,onCheckIn,onSkip,onEdit,o
   function row(item:AgendaItem,next=false) {
     const {task,record,overdue,dateKey}=item,category=categories.find(category=>category.id===task.categoryId)
     const recurrence=recurrenceShortLabel(task)
-    const completionLabel=record?`${fmtDate(new Date(record.completedAt))!==dateKey?fmtDate(new Date(record.completedAt)).slice(5)+' ':''}${new Date(record.completedAt).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})}`:''
+    const title=record?.taskTitle||task.title
+    let completionLabel=''
+    if(record) {
+      const clockDate=record.keepOccurrenceDate || task.recurrence!=='none' ? dateKey : fmtDate(record.completedAt)
+      const end=checkInClock(record.completedAt,clockDate)
+      if(end.endsWith('⁺')) {
+        const start=record.startedAt==null?end:checkInClock(record.startedAt,dateKey)
+        completionLabel=start===end?end:`${start} – ${end}`
+      } else {
+        completionLabel=`${fmtDate(record.completedAt)!==dateKey?fmtDate(record.completedAt).slice(5)+' ':''}${end}`
+      }
+    }
     return <div key={`${task.id}@${dateKey}`} data-task-id={task.id} data-occurrence={dateKey} className={`agenda-task ${overdue?'is-overdue':next?'is-next':''} ${record?'is-done':''}`} style={{backgroundColor:habitBackground(task,category?.color)}}>
-      <button type="button" onClick={()=>onEdit(task.id)} className="agenda-task-content" aria-label={`编辑任务：${task.title}`}>
+      <button type="button" onClick={()=>onEdit(task.id)} className="agenda-task-content" aria-label={`编辑任务：${title}`}>
         <span className="agenda-task-time">{overdue&&compact?'逾期':task.scheduledTime||(task.calendarAllDay?'全天':'时间待定')}</span>
         <span className="min-w-0 flex-1">
-          <span className="agenda-task-title">{task.title}</span>
-          {!compact&&<span className="agenda-task-meta">{record?`完成于 ${completionLabel}`:[recurrence,category?.name].filter(Boolean).join(' · ')||'临时事项'}{!record&&task.target?` · 目标 ${task.target}${task.unit||''}`:''}</span>}
+          <span className="agenda-task-title">{title}</span>
+          {(!compact||record)&&<span className="agenda-task-meta">{record?`完成于 ${completionLabel}${title!==task.title?` · 来自习惯 ${task.title}`:''}`:[recurrence,category?.name].filter(Boolean).join(' · ')||'临时事项'}{!record&&task.target?` · 目标 ${task.target}${task.unit||''}`:''}</span>}
         </span>
         {overdue&&!compact&&<span className="agenda-badge">逾期</span>}
         {task.priority==='high'&&!overdue&&<span className="text-xs text-orange-600 shrink-0">重要</span>}
       </button>
       {!record && recurrence && !task.isQuick && onSkip && (
-        <button type="button" className="agenda-skip" aria-label={`跳过本次：${task.title}`} onClick={() => onSkip(task.id,dateKey)}>跳过</button>
+        <button type="button" className="agenda-skip" aria-label={`跳过本次：${title}`} onClick={() => onSkip(task.id,dateKey)}>跳过</button>
       )}
-      <button type="button" className={`agenda-check ${record?'checked':''}`} aria-label={`${record?'取消完成':'标记完成'}：${task.title}`} onClick={()=>onCheckIn(task.id,!!record,dateKey)}>{record&&<Icons.Check size={17}/>}</button>
+      <button type="button" className={`agenda-check ${record?'checked':''}`} aria-label={`${record?'取消完成':'标记完成'}：${title}`} onClick={()=>onCheckIn(task.id,!!record,dateKey)}>{record&&<Icons.Check size={17}/>}</button>
     </div>
   }
   function section(title:string,items:AgendaItem[]) {
