@@ -16,7 +16,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <property android:name="android.window.PROPERTY_COMPAT_ALLOW_SMALL_COVER_SCREEN" android:value="1" />
+        <property android:name="android.window.PROPERTY_COMPAT_ALLOW_SMALL_COVER_SCREEN" android:value="5" />
         <meta-data android:name="android.supports_size_changes" android:value="true" />
         <meta-data android:name="miui.supportAppContinuity" android:value="true" />
         <meta-data android:name="miui.supportFlipFullScreen" android:value="1" />
