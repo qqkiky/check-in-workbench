@@ -305,7 +305,7 @@ public final class CalendarRepository {
 
         String outgoing=fingerprint(new JSONObject().put("title",title).put("start",startMillis).put("end",endMillis)
             .put("lead",reminderLeadMin).put("completed",completed).put("reminder",reminderEnabled).put("allDay",allDay).toString());
-        if(existing>0&&outgoing.equals(context.getSharedPreferences("calendar-outgoing",0).getString(taskId,null))
+        if(!completed&&existing>0&&outgoing.equals(context.getSharedPreferences("calendar-outgoing",0).getString(taskId,null))
             &&fingerprint(eventSnapshot(existing).toString()).equals(context.getSharedPreferences("calendar-snapshots",0).getString(taskId,null)))return existing;
 
         ContentValues ev = new ContentValues();
@@ -320,7 +320,7 @@ public final class CalendarRepository {
             ev.put(Events.DESCRIPTION, description != null ? description : "");ev.put(Events.EVENT_COLOR, 0x4F6EF7);
             ev.put(Events.CUSTOM_APP_PACKAGE,context.getPackageName());ev.put(Events.CUSTOM_APP_URI,new Uri.Builder().scheme("qidai").authority("task").appendPath(taskId).build().toString());
         }
-        boolean adjustReminders=!preserveOriginal||previous==null||previous.optBoolean("reminderEnabled")!=(!completed&&reminderEnabled)||previous.optInt("reminderLeadMin")!=reminderLeadMin;
+        boolean adjustReminders=completed||!preserveOriginal||previous==null||previous.optBoolean("reminderEnabled")!=(!completed&&reminderEnabled)||previous.optInt("reminderLeadMin")!=reminderLeadMin;
 
         long eventId;
         if (existing > 0) {

@@ -16,5 +16,6 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CoachRemindersPlugin.class);
         registerPlugin(CoachDailyPlugin.class);
         super.onCreate(savedInstanceState);
+        TaskRolloverReceiver.schedule(this);
     }
 }

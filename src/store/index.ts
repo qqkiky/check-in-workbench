@@ -7,6 +7,7 @@ import { generateSeedData } from '@/utils/seed'
 import { taskOccursOnDate } from '@/utils/recurrence'
 import { syncTaskToCalendar, removeTaskFromCalendar } from '@/capacitor/task-calendar'
 import { planCalendarDeletions } from '@/services/calendarDeletion'
+import { rollOverdueTasks } from '@/services/taskRollover'
 
 interface StoreState {
   tasks: Task[]
@@ -25,6 +26,7 @@ interface StoreState {
   // Actions
   init: () => void
   reload: () => void
+  rolloverTasks: () => string[]
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void
   saveAgentTaskBatch: (tasks: Task[], records: CheckInRecord[], noteIds: string[]) => Promise<void>
   updateTask: (id: string, patch: Partial<Task>) => void
@@ -158,6 +160,16 @@ export const useStore = create<StoreState>((set, get) => ({
     })
   },
 
+  rolloverTasks() {
+    const state = get()
+    const plan = rollOverdueTasks(state.tasks,state.records)
+    if (plan.changedIds.length) {
+      storage.setTasks(plan.tasks)
+      set({ tasks: plan.tasks })
+    }
+    return plan.changedIds
+  },
+
   addTask(task) {
     const now = Date.now()
     const newTask: Task = {
@@ -188,6 +200,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set(next)
     try {
       await persisted
+      for (const task of addedTasks) void syncTaskToCalendar(task, get().records)
     } catch (error) {
       const current = get()
       const restored = {

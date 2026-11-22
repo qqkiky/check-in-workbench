@@ -43,6 +43,32 @@ public class CalendarRepositoryTest {
     }
     private long add(String key) throws Exception {return repository.upsertEvent(key,"demo",1000000,2000000,0,"",false,true);}
 
+    @Test public void earlyCompletionCancelsOnlyThatOccurrenceAndUndoRestoresReminder() throws Exception {
+        String today="habit@2026-11-22",tomorrow="habit@2026-11-23";
+        long id=add(today),next=add(tomorrow);
+        assertEquals(id,repository.upsertEvent(today,"demo",1000000,2000000,0,"",true,true));
+        assertEquals(0,(int)provider.events.get(id).getAsInteger(Events.HAS_ALARM));
+        assertFalse(provider.reminders.contains(id));
+        assertTrue(provider.reminders.contains(next));
+        // Repair leftover provider reminders even if the outgoing completion snapshot matches.
+        provider.reminders.add(id);
+        repository.upsertEvent(today,"demo",1000000,2000000,0,"",true,true);
+        assertFalse(provider.reminders.contains(id));
+        repository.upsertEvent(today,"demo",1000000,2000000,0,"",false,true);
+        assertEquals(1,(int)provider.events.get(id).getAsInteger(Events.HAS_ALARM));
+        assertTrue(provider.reminders.contains(id));
+    }
+
+    @Test public void automaticOneOffRolloverReusesTheCalendarRowAndMovesItsReminder() throws Exception {
+        long id=add("one@2026-11-21");
+        long rolled=repository.upsertEvent("one@2026-11-22","demo",9000000,10000000,0,"",false,true,false,true);
+        assertEquals(id,rolled);
+        assertEquals(1,provider.events.size());
+        assertEquals(9000000L,(long)provider.events.get(id).getAsLong(Events.DTSTART));
+        assertTrue(provider.reminders.contains(id));
+        assertEquals(0,repository.collectDeletions().length());
+    }
+
     @Test public void deletedEventIsNotRecreatedByForegroundOrBackgroundUpsert() throws Exception {
         String key="one@2026-11-02";long id=add(key);provider.events.remove(id);
         assertEquals(key,repository.collectDeletions().getString(0));

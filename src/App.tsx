@@ -89,8 +89,10 @@ export default function App() {
 
   // 启动后把现有「开启提醒」的待办同步到系统日历（原生平台生效，Web 端 no-op）
   useEffect(() => {
+    if (!initialized) return
     let timer:ReturnType<typeof setTimeout>
     const sync=()=>{
+      useStore.getState().rolloverTasks()
       clearTimeout(timer)
       timer=setTimeout(()=>{
       const state = useStore.getState()
@@ -102,8 +104,13 @@ export default function App() {
     document.addEventListener('visibilitychange',visible)
     window.addEventListener('focus',sync)
     const unwatch=watchCalendarChanges(sync)
-    return () => {unwatch();clearTimeout(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',sync)}
-  }, [])
+    let day = new Date().toDateString()
+    const midnight=setInterval(()=>{
+      const next=new Date().toDateString()
+      if(next!==day){day=next;sync()}
+    },30000)
+    return () => {unwatch();clearInterval(midnight);clearTimeout(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',sync)}
+  }, [initialized])
 
   useEffect(() => {
     setAnimateKey((k) => k + 1)

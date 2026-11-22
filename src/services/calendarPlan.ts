@@ -35,7 +35,7 @@ export function buildCalendarEvents(task: Task, records: CheckInRecord[], now = 
     const completed = records.some(record => record.taskId === task.id && (task.recurrence==='none'||record.date === date))
     return { taskId: `${task.id}@${date}`, title: task.title, startMillis: start,
       endMillis: start + (task.duration && task.duration > 0 ? task.duration : allDay?1440:30) * 60000,
-      reminderLeadMin: task.reminderLead ?? 0, completed, reminderEnabled: !!task.reminderEnabled,
+      reminderLeadMin: task.reminderLead ?? 0, completed, reminderEnabled: !completed && !!task.reminderEnabled,
       singleOccurrence:task.recurrence==='none',...(allDay?{allDay:true}:{}),description: completed ? '已在打卡工作台完成' : '来自打卡工作台' }
   }).filter(event => Number.isFinite(event.startMillis))
 }

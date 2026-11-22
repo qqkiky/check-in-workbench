@@ -33,6 +33,8 @@ test('completion is occurrence-specific and reversible',()=>{
   const recurring={...task,recurrence:'daily'};
   const events=buildCalendarEvents(recurring,[record],new Date(2026,9,30));
   assert.equal(events.find(e=>e.taskId.endsWith('@2026-10-30')).completed,true);
+  assert.equal(events.find(e=>e.taskId.endsWith('@2026-10-30')).reminderEnabled,false);
+  assert.equal(events.find(e=>e.taskId.endsWith('@2026-10-31')).reminderEnabled,true);
   assert.equal(events.find(e=>e.taskId.endsWith('@2026-10-31')).completed,false);
 });
 test('calendar never receives private task description',()=>{
